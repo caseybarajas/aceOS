@@ -1,4 +1,4 @@
-CaseyOS: Design Notes & Rules
+aceOS: Design Notes & Rules
 Project Goal
 
 To create a very basic, MS-DOS style operating system from scratch for learning purposes.
@@ -65,9 +65,9 @@ Coding Style & Rules
 
     Resource Management: Be mindful of memory and CPU cycles, especially in the bootloader and early kernel.
 
-In-OS Cursor Handling Rules (For CaseyOS Interface)
+In-OS Cursor Handling Rules (For aceOS Interface)
 
-This section defines how the text cursor should behave within the CaseyOS environment (e.g., in the command shell or any text-based utilities).
+This section defines how the text cursor should behave within the aceOS environment (e.g., in the command shell or any text-based utilities).
 
     Visibility:
 
@@ -119,7 +119,7 @@ This section defines how the text cursor should behave within the CaseyOS enviro
 
 Code Editor (IDE/Text Editor) Cursor & Editing Preferences
 
-This section outlines preferred settings and behaviors for the code editor used to develop CaseyOS. These are guidelines for the development environment, not for CaseyOS itself.
+This section outlines preferred settings and behaviors for the code editor used to develop aceOS. These are guidelines for the development environment, not for aceOS itself.
 
     Cursor Style:
 

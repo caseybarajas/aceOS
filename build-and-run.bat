@@ -1,11 +1,11 @@
 @echo off
-echo Building CaseyOS using Docker...
+echo Building aceOS using Docker...
 
 REM Build the Docker image
 docker-compose build
 
 REM Run the build process in the Docker container
-docker-compose run --rm caseyos-dev make clean all
+docker-compose run --rm aceos-dev make clean all
 
 REM Check if the build was successful
 if %ERRORLEVEL% neq 0 (

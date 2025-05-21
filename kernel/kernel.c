@@ -1,5 +1,5 @@
 // kernel.c
-// a very minimal c kernel for caseyos.
+// a very minimal c kernel for aceos.
 
 #include <stdint.h>
 #include "idt.h"

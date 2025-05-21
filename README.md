@@ -1,10 +1,10 @@
-# CaseyOS
+# aceOS
 
 A bootable operating system featuring a 16-bit bootloader that launches a 32-bit kernel, designed for educational purposes.
 
 ## Project Overview
 
-CaseyOS is a basic operating system with:
+aceOS is a basic operating system with:
 - A 16-bit bootloader written in assembly
 - A simple C kernel that displays text on screen
 - Docker-based build system for cross-platform development

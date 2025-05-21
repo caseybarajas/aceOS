@@ -1,20 +1,20 @@
 #!/bin/bash
 
-echo "Building CaseyOS using Docker..."
+echo "Building aceOS using Docker..."
 
 # Build the Docker image
 docker-compose build
 
 # Run the build process in the Docker container
-docker-compose run --rm caseyos-dev make clean all
+docker-compose run --rm aceos-dev make clean all
 
 # Run QEMU to test the OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # For macOS, we need to handle display differently
-  docker run -it --rm -v $(pwd):/caseyos caseyos-caseyos-dev qemu-system-i386 -fda /caseyos/os_image.img -display cocoa
+  docker run -it --rm -v $(pwd):/aceos aceos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img -display cocoa
 else
   # For Linux
-  docker run -it --rm -v $(pwd):/caseyos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix caseyos-caseyos-dev qemu-system-i386 -fda /caseyos/os_image.img
+  docker run -it --rm -v $(pwd):/aceos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix aceos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
 fi
 
 echo "Build process complete!"

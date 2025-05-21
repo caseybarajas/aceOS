@@ -1,12 +1,12 @@
 version: '3'
 
 services:
-  caseyos-dev:
+  aceos-dev:
     build: 
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/caseyos
-    working_dir: /caseyos
+      - .:/aceos
+    working_dir: /aceos
     tty: true
     stdin_open: true 

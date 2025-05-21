@@ -1,6 +1,6 @@
 ; boot.asm
-; a very simple bootloader for caseyos.
-; this bootloader prints "bootloader loaded. welcome to caseyos!" to the screen.
+; a very simple bootloader for aceos.
+; this bootloader prints "bootloader loaded. welcome to aceos!" to the screen.
 ; it loads a c kernel and switches to 32-bit protected mode before jumping to it.
 
 bits 16             ; we are in 16-bit real mode
@@ -151,7 +151,7 @@ halt_system:
     jmp halt_system ; in case of interrupt, halt again
 
 message:
-    db "Bootloader loaded. Welcome to CaseyOS!", 13, 10, 0 ; with CR+LF
+    db "Bootloader loaded. Welcome to aceOS!", 13, 10, 0 ; with CR+LF
 
 kernel_loading_msg:
     db "Loading kernel...", 13, 10, 0

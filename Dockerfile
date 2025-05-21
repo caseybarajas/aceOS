@@ -17,10 +17,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # set working directory
-WORKDIR /caseyos
+WORKDIR /aceos
 
 # volume for code
-VOLUME ["/caseyos"]
+VOLUME ["/aceos"]
 
 # default command
 CMD ["/bin/bash"] 

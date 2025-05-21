@@ -1,4 +1,4 @@
-# makefile for caseyos
+# makefile for aceOS
 
 # tools
 NASM = nasm
