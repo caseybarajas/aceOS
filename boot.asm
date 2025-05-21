@@ -1,7 +1,7 @@
 ; boot.asm
-; a very simple 16-bit bootloader for an ms-dos style os.
+; a very simple bootloader for caseyos.
 ; this bootloader prints "bootloader loaded. welcome to caseyos!" to the screen.
-; it then loads and calls a c kernel.
+; it loads a c kernel and switches to 32-bit protected mode before jumping to it.
 
 bits 16             ; we are in 16-bit real mode
 
@@ -53,9 +53,9 @@ load_kernel:
     int 0x13
     jc disk_error   ; if carry flag is set, error occurred
     
-    ; load the kernel (from sector 1, right after bootloader)
+    ; load the kernel (from sector 2, right after bootloader)
     mov ah, 0x02    ; BIOS read sector function
-    mov al, 10      ; number of sectors to read (adjust as needed)
+    mov al, 20      ; number of sectors to read (increased to 20 to be safe)
     xor ch, ch      ; cylinder 0
     mov cl, 2       ; sector 2 (sectors are 1-based, sector 1 is bootloader)
     xor dh, dh      ; head 0
@@ -73,23 +73,74 @@ load_kernel:
     mov si, kernel_loaded_msg
     call print_string
     
-    ; Set up segment registers for kernel
-    ; The kernel code is loaded at physical address 0x10000 (segment 0x1000:0)
-    mov ax, 0x1000  ; Set all segments to where the kernel is loaded
+    ; Wait a moment for message to be visible
+    mov cx, 0xFFFF
+delay_loop:
+    loop delay_loop
+
+    ; Now switch to protected mode
+    cli             ; disable interrupts
+    
+    ; Load GDT register
+    lgdt [gdt_descriptor]
+    
+    ; Set protected mode bit in CR0
+    mov eax, cr0
+    or eax, 0x1     ; set PE (Protection Enable) bit
+    mov cr0, eax
+    
+    ; Far jump to clear the pipeline and load CS with 32-bit selector
+    jmp CODE_SEG:protected_mode_entry
+
+; GDT (Global Descriptor Table) for protected mode
+gdt_start:
+    ; Null descriptor (required)
+    dq 0            ; 8 bytes of zeros
+
+gdt_code:           ; CS should point to this descriptor
+    dw 0xFFFF       ; limit (bits 0-15)
+    dw 0            ; base (bits 0-15)
+    db 0            ; base (bits 16-23)
+    db 10011010b    ; access byte: present, ring 0, code segment, executable, direction 0, readable
+    db 11001111b    ; flags + limit (bits 16-19): 4k granularity, 32-bit, limit bits 16-19
+    db 0            ; base (bits 24-31)
+
+gdt_data:           ; DS, SS, ES, FS, GS should point to this descriptor
+    dw 0xFFFF       ; limit (bits 0-15)
+    dw 0            ; base (bits 0-15)
+    db 0            ; base (bits 16-23)
+    db 10010010b    ; access byte: present, ring 0, data segment, direction 0, writable
+    db 11001111b    ; flags + limit (bits 16-19): 4k granularity, 32-bit, limit bits 16-19
+    db 0            ; base (bits 24-31)
+
+gdt_end:            ; for calculating GDT size
+
+gdt_descriptor:
+    dw gdt_end - gdt_start - 1  ; size of GDT, always one less than true size
+    dd gdt_start                ; address (32-bit) of GDT
+
+; Define constants for GDT segment selectors
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
+
+; 32-bit protected mode code
+[bits 32]
+protected_mode_entry:
+    ; Set up data segment registers
+    mov ax, DATA_SEG
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
-    ; Don't change SS:SP since we're still using the bootloader's stack
+    mov ss, ax
     
-    ; jump to kernel
-    jmp 0x1000:0x0000  ; far jump to kernel entry point
+    ; Set up 32-bit stack at the top of free memory
+    mov esp, 0x90000
+    
+    ; Jump to the kernel entry point (loaded at 0x10000)
+    jmp 0x10000
 
-disk_error:
-    mov si, disk_error_msg
-    call print_string
-    jmp halt_system
-
+[bits 16]
 ; print null-terminated string pointed to by si
 print_string:
     pusha           ; save registers
@@ -104,6 +155,11 @@ print_string_done:
     popa            ; restore registers
     ret
 
+disk_error:
+    mov si, disk_error_msg
+    call print_string
+    jmp halt_system
+
 halt_system:
     cli             ; disable interrupts
     hlt             ; halt the processor
@@ -116,7 +172,7 @@ kernel_loading_msg:
     db "Loading kernel...", 13, 10, 0
 
 kernel_loaded_msg:
-    db "Kernel loaded successfully!", 13, 10, 0
+    db "Kernel loaded successfully! Switching to protected mode...", 13, 10, 0
 
 disk_error_msg:
     db "Disk read error!", 13, 10, 0

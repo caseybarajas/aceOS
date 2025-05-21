@@ -10,7 +10,7 @@ OBJCOPY = objcopy
 NASMFLAGS_BOOT = -f bin -o boot.bin
 
 # gcc flags for kernel - we're targeting flat binary for simplicity
-CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -c -o kernel.o
+CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -c -o kernel.o
 LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 
 # files

@@ -2,14 +2,27 @@
 // a very minimal c kernel for caseyos.
 
 // Define constants for video memory and display attributes
-#define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address
+#define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
+// For real mode segmented addressing, we need to adjust how we access this
 #define COLUMNS 80
 #define ROWS 25
 #define WHITE_ON_BLACK 0x07
 
+// Function prototypes
+void kernel_main(void);
+
+// Entry point - this will be called by the bootloader
+void _start() {
+    kernel_main();
+    
+    // In case kernel_main ever returns (it shouldn't)
+    while(1) {}
+}
+
 // Fill the screen with a pattern to make it obvious if the kernel is running
 void fill_screen_pattern() {
-    volatile unsigned char *video_memory = (volatile unsigned char*)REAL_MODE_VIDEO_MEM;
+    // Access video memory - we're loaded at 0x10000, but in real mode with segmented addresses
+    volatile unsigned char *video_memory = (volatile unsigned char*)0xB8000;
     char pattern = 'A';
     
     // Write a pattern of characters to make it very visible
@@ -24,7 +37,7 @@ void fill_screen_pattern() {
 
 // Clear the screen to black
 void clear_screen() {
-    volatile unsigned char *video_memory = (volatile unsigned char*)REAL_MODE_VIDEO_MEM;
+    volatile unsigned char *video_memory = (volatile unsigned char*)0xB8000;
     
     for (int i = 0; i < COLUMNS * ROWS * 2; i += 2) {
         video_memory[i] = ' ';          // space character
@@ -34,7 +47,7 @@ void clear_screen() {
 
 // Print a single character at a specific position
 void k_print_char(char c, unsigned char attribute, int row, int col) {
-    volatile unsigned char *video_memory = (volatile unsigned char*)REAL_MODE_VIDEO_MEM;
+    volatile unsigned char *video_memory = (volatile unsigned char*)0xB8000;
     int offset = (row * COLUMNS + col) * 2;
     
     if (offset < 0 || offset >= COLUMNS * ROWS * 2) {
@@ -102,12 +115,4 @@ void kernel_main() {
         
         k_print_char(blinker, 0x0F, 5, 0); // Bright white blinker
     }
-}
-
-// Entry point - this will be called by the bootloader
-void _start() {
-    kernel_main();
-    
-    // In case kernel_main ever returns (it shouldn't)
-    while(1) {}
 }
