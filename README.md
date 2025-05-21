@@ -1,76 +1,71 @@
 # CaseyOS
 
-A simple MS-DOS style operating system built from scratch for learning purposes.
+A bootable operating system featuring a 16-bit bootloader that launches a 32-bit kernel, designed for educational purposes.
 
 ## Project Overview
 
-CaseyOS is a basic operating system with the following components:
-- A 16-bit bootloader written in assembly (NASM)
-- A minimal C kernel
-- A build system using Make
+CaseyOS is a basic operating system with:
+- A 16-bit bootloader written in assembly
+- A simple C kernel that displays text on screen
+- Docker-based build system for cross-platform development
 
-## Development Environment
+## Requirements
 
-This project includes a Docker setup for development which provides all the necessary tools:
-- NASM (assembler)
-- GCC (C compiler)
-- Make (build system)
-- QEMU (emulator)
+- Docker and Docker Compose
+- On Windows: X server like VcXsrv for display forwarding (optional)
 
-### Getting Started with Docker
+## Getting Started
 
-1. Build and start the development container:
+### On Windows:
+
+1. Install Docker Desktop for Windows
+2. (Optional) Install VcXsrv and start it with "Multiple Windows", "Start no client", and "Disable access control" options
+3. Run the build script:
    ```
-   docker-compose up -d
-   ```
-
-2. Access the container shell:
-   ```
-   docker exec -it caseyos-dev bash
+   .\build-and-run.bat
    ```
 
-3. Inside the container, you can build and run CaseyOS:
+### On Linux/macOS:
+
+1. Install Docker and Docker Compose
+2. Make the build script executable:
    ```
-   make clean
-   make
-   make run
+   chmod +x build-and-run.sh
    ```
-
-### Building Without Docker
-
-If you prefer not to use Docker, you'll need to install the following tools:
-
-#### Windows:
-```powershell
-# Install Chocolatey if not already installed
-Set-ExecutionPolicy Bypass -Scope Process -Force
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# Install required tools using Chocolatey
-choco install -y nasm mingw make qemu
-```
-
-#### Build and Run
-```
-make clean
-make
-make run
-```
+3. Run the build script:
+   ```
+   ./build-and-run.sh
+   ```
 
 ## Project Structure
 
-- `boot.asm`: Bootloader code
-- `kernel.c`: C kernel stub
-- `Makefile`: Build configuration
-- `Notes/design-notes.md`: Detailed project documentation
+- `boot.asm`: Bootloader that loads and jumps to the kernel
+- `kernel.c`: Simple C kernel that displays text on screen
+- `Makefile`: Build instructions for the OS
+- `Dockerfile` and `docker-compose.yml`: Docker configuration for build environment
 
-## Current Status
+## How It Works
 
-Currently, the bootloader successfully:
-1. Initializes segments
-2. Clears the screen
-3. Prints a welcome message
-4. Halts the CPU
+1. The bootloader is loaded at address 0x7C00 by the BIOS
+2. The bootloader displays a welcome message
+3. The bootloader loads the kernel from disk into memory at address 0x10000
+4. The kernel initializes and displays its own message on screen
 
-Next steps include loading the C kernel from the bootloader. 
+## Exiting QEMU
+
+To exit QEMU:
+1. Press Ctrl+Alt+2 to switch to the QEMU monitor
+2. Type `quit` and press Enter
+
+## Next Steps for Development
+
+Future enhancements could include:
+- GDT and IDT initialization
+- Basic interrupt handling
+- Simple keyboard driver
+- Memory management
+- A basic shell
+
+## License
+
+This project is open source and available for educational purposes. 
