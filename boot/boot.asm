@@ -21,26 +21,11 @@ start:              ; start of bootloader code
     mov al, 0x03    ; text mode 80x25, 16 colors
     int 0x10
 
-    ; set cursor position to top-left (row 0, col 0)
-    mov ah, 0x02    ; bios video service: set cursor position
-    mov bh, 0       ; page number 0
-    mov dh, 0       ; row 0
-    mov dl, 0       ; column 0
-    int 0x10
+    ; disable hardware cursor
+    call disable_cursor
 
     ; print the welcome message
     mov si, message ; point si to our message
-print_char:
-    lodsb           ; load byte from [si] into al, and increment si
-    or al, al       ; check if al is null (end of string)
-    jz load_kernel  ; if zero, jump to kernel loading
-
-    mov ah, 0x0E    ; bios teletype output function
-    mov bh, 0       ; page number 0
-    mov bl, 0x07    ; white text on black background
-    int 0x10        ; call bios video interrupt
-
-    jmp print_char  ; loop to print next character
 
 load_kernel:
     ; print kernel loading message
@@ -176,6 +161,25 @@ kernel_loaded_msg:
 
 disk_error_msg:
     db "Disk read error!", 13, 10, 0
+
+disable_cursor:
+	pushf
+	push eax
+	push edx
+
+	mov dx, 0x3D4
+	mov al, 0xA	; low cursor shape register
+	out dx, al
+
+	inc dx
+	mov al, 0x20	; bits 6-7 unused, bit 5 disables the cursor, bits 0-4 control the cursor shape
+	out dx, al
+
+	pop edx
+	pop eax
+	popf
+	ret
+   
 
 ; padding and magic number for bootable sector
 times 510 - ($-$$) db 0 ; pad remainder of 510 bytes with 0
