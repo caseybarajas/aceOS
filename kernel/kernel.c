@@ -1,10 +1,11 @@
 // kernel.c
 // a very minimal c kernel for aceos.
 
-#include <stdint.h>
+#include "libc/stdint.h"
 #include "idt.h"
 #include "isr.h"
 #include "keyboard.h"
+#include "libc/libc.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -126,24 +127,6 @@ void print_shell_prompt() {
     update_cursor();
 }
 
-// Compare two strings
-int strcmp(const char* s1, const char* s2) {
-    while(*s1 && (*s1 == *s2)) {
-        s1++;
-        s2++;
-    }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
-}
-
-// String length
-int strlen(const char* str) {
-    int len = 0;
-    while (str[len]) {
-        len++;
-    }
-    return len;
-}
-
 // Process and execute the command
 void process_command(const char* command) {
     // Add to history if not empty
@@ -215,19 +198,6 @@ void execute_command(const char* command) {
         cursor_col = 17;
         k_print_string(command, WHITE_ON_BLACK, cursor_row, cursor_col);
     }
-}
-
-// Compare the first n characters of two strings
-int strncmp(const char* s1, const char* s2, int n) {
-    while(n > 0 && *s1 && (*s1 == *s2)) {
-        s1++;
-        s2++;
-        n--;
-    }
-    if (n == 0) {
-        return 0;
-    }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
 
 // Clear the command buffer
@@ -304,6 +274,9 @@ void kernel_main() {
     k_print_string("Interrupts enabled", WHITE_ON_BLACK, 4, 0);
 
 	clear_screen();
+
+    // Initialize C standard library
+    libc_init();
 
     // Keyboard input demo message
     k_print_string("aceOS Shell v0.1", WHITE_ON_BLACK, 0, 0);

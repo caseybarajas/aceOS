@@ -11,6 +11,7 @@ INCLUDE_DIR = include
 BOOT_DIR = boot
 KERNEL_DIR = kernel
 DRIVERS_DIR = drivers
+LIBC_DIR = src/libc
 
 # nasm flags for bootloader (output raw binary)
 NASMFLAGS_BOOT = -f bin -o boot.bin
@@ -25,12 +26,14 @@ BOOT_SRC = $(BOOT_DIR)/boot.asm
 KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c
 DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c
 INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
+LIBC_SRCS = $(LIBC_DIR)/string.c $(LIBC_DIR)/stdio.c $(LIBC_DIR)/stdlib.c $(LIBC_DIR)/libc.c
 
 # objects
 KERNEL_OBJS = $(KERNEL_SRCS:.c=.o)
 DRIVER_OBJS = $(DRIVER_SRCS:.c=.o)
 INT_OBJ = $(KERNEL_DIR)/interrupt.o
-ALL_OBJS = $(KERNEL_OBJS) $(DRIVER_OBJS) $(INT_OBJ)
+LIBC_OBJS = $(LIBC_SRCS:.c=.o)
+ALL_OBJS = $(KERNEL_OBJS) $(DRIVER_OBJS) $(INT_OBJ) $(LIBC_OBJS)
 
 # output files
 KERNEL_BIN = kernel.bin
