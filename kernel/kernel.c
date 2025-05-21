@@ -14,14 +14,31 @@
 #define WHITE_ON_BLACK 0x07
 #define BRIGHT_WHITE_ON_BLACK 0x0F
 
+// Shell constants
+#define MAX_COMMAND_LENGTH 72
+#define COMMAND_HISTORY_SIZE 10
+#define SHELL_PROMPT "aceOS> "
+
 // Terminal state
 static int cursor_col = 0;
 static int cursor_row = 10;
+
+// Shell state
+static char current_command[MAX_COMMAND_LENGTH];
+static int command_length = 0;
+static char command_history[COMMAND_HISTORY_SIZE][MAX_COMMAND_LENGTH];
+static int history_count = 0;
+static int history_position = -1;
 
 // Function prototypes
 void kernel_main(void);
 void terminal_putchar(char c);
 void update_cursor();
+void print_shell_prompt();
+void process_command(const char* command);
+void execute_command(const char* command);
+void clear_command_buffer();
+void shell_handle_input(char c);
 
 // Entry point - this will be called by the bootloader
 void _start() {
@@ -101,6 +118,126 @@ void update_cursor() {
     k_print_char('_', BRIGHT_WHITE_ON_BLACK, cursor_row, cursor_col);
 }
 
+// Print the shell prompt
+void print_shell_prompt() {
+	cursor_row++;
+    k_print_string(SHELL_PROMPT, WHITE_ON_BLACK, cursor_row, 0);
+    cursor_col = sizeof(SHELL_PROMPT) - 1;  // Move cursor after prompt
+    update_cursor();
+}
+
+// Compare two strings
+int strcmp(const char* s1, const char* s2) {
+    while(*s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+    }
+    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+// String length
+int strlen(const char* str) {
+    int len = 0;
+    while (str[len]) {
+        len++;
+    }
+    return len;
+}
+
+// Process and execute the command
+void process_command(const char* command) {
+    // Add to history if not empty
+    if (command_length > 0) {
+        // Copy command to history
+        int i;
+        for (i = 0; i < command_length && i < MAX_COMMAND_LENGTH - 1; i++) {
+            command_history[history_count][i] = command[i];
+        }
+        command_history[history_count][i] = '\0';
+        
+        history_count = (history_count + 1) % COMMAND_HISTORY_SIZE;
+        history_position = -1;  // Reset history position
+        
+        // Execute the command
+        execute_command(command);
+    }
+    
+    // Start a new line for the next prompt
+    cursor_row++;
+    cursor_col = 0;
+    
+    // Show the prompt again
+    print_shell_prompt();
+}
+
+// Execute shell commands
+void execute_command(const char* command) {
+    if (strcmp(command, "help") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Available commands:", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("help     - Show this help", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("clear    - Clear the screen", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("version  - Show OS version", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("echo     - Echo text to screen", WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+    else if (strcmp(command, "clear") == 0) {
+        clear_screen();
+        cursor_row = -2; // forces the prompt to be at the top of the screen
+        cursor_col = 0;
+    }
+    else if (strcmp(command, "version") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("aceOS v0.1", WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+    else if (strncmp(command, "echo ", 5) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string(command + 5, WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+    else if (command_length > 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Unknown command: ", WHITE_ON_BLACK, cursor_row, cursor_col);
+        cursor_col = 17;
+        k_print_string(command, WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+}
+
+// Compare the first n characters of two strings
+int strncmp(const char* s1, const char* s2, int n) {
+    while(n > 0 && *s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+        n--;
+    }
+    if (n == 0) {
+        return 0;
+    }
+    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+// Clear the command buffer
+void clear_command_buffer() {
+    for (int i = 0; i < MAX_COMMAND_LENGTH; i++) {
+        current_command[i] = '\0';
+    }
+    command_length = 0;
+}
+
 // Process a character input and display it in the terminal
 void terminal_putchar(char c) {
     // Remove current cursor
@@ -108,65 +245,40 @@ void terminal_putchar(char c) {
     
     // Handle special characters
     if (c == '\n') {
-        // New line
-        cursor_row++;
-        cursor_col = 0;
-        
-        // Scroll if needed
-        if (cursor_row >= ROWS) {
-            cursor_row = ROWS - 1;
-            // In a full implementation, we would scroll the screen here
-        }
+        // New line - process command
+        current_command[command_length] = '\0';
+        process_command(current_command);
+        clear_command_buffer();
+        return;
     } 
     else if (c == '\b') {
-        // Backspace
-        if (cursor_col > 0) {
+        // Backspace - remove character from buffer
+        if (cursor_col > sizeof(SHELL_PROMPT) - 1) {
             cursor_col--;
             k_print_char(' ', WHITE_ON_BLACK, cursor_row, cursor_col);
-        }
-        else if (cursor_row > 10) {
-            // Go to end of previous line
-            cursor_row--;
-            cursor_col = COLUMNS - 1;
-            k_print_char(' ', WHITE_ON_BLACK, cursor_row, cursor_col);
+            command_length--;
+            current_command[command_length] = '\0';
         }
     }
     else if (c == '\t') {
-        // Tab - move cursor to next tab stop (every 8 columns)
-        cursor_col = (cursor_col + 8) & ~7;
-        
-        // Wrap if needed
-        if (cursor_col >= COLUMNS) {
-            cursor_col = 0;
-            cursor_row++;
-            
-            // Scroll if needed
-            if (cursor_row >= ROWS) {
-                cursor_row = ROWS - 1;
-                // In a full implementation, we would scroll the screen here
-            }
-        }
+        // Tab - for command completion in future
     }
     else {
-        // Regular character
-        k_print_char(c, WHITE_ON_BLACK, cursor_row, cursor_col);
-        cursor_col++;
-        
-        // Wrap if needed
-        if (cursor_col >= COLUMNS) {
-            cursor_col = 0;
-            cursor_row++;
-            
-            // Scroll if needed
-            if (cursor_row >= ROWS) {
-                cursor_row = ROWS - 1;
-                // In a full implementation, we would scroll the screen here
-            }
+        // Regular character - add to buffer if there's room
+        if (command_length < MAX_COMMAND_LENGTH - 1 && cursor_col < COLUMNS - 1) {
+            current_command[command_length++] = c;
+            k_print_char(c, WHITE_ON_BLACK, cursor_row, cursor_col);
+            cursor_col++;
         }
     }
     
     // Update cursor position
     update_cursor();
+}
+
+// Handle shell input including control keys and history
+void shell_handle_input(char c) {
+    terminal_putchar(c);
 }
 
 // Entry point for the kernel - called from bootloader
@@ -190,20 +302,25 @@ void kernel_main() {
     asm volatile("sti");
     
     k_print_string("Interrupts enabled", WHITE_ON_BLACK, 4, 0);
-    
+
+	clear_screen();
+
     // Keyboard input demo message
-    k_print_string("Type on the keyboard (starting on line 10):", WHITE_ON_BLACK, 9, 0);
+    k_print_string("aceOS Shell v0.1", WHITE_ON_BLACK, 0, 0);
+    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 1, 0);
 
-
+    // Initialize shell
+    cursor_row = 3;
     cursor_col = 0;
-    cursor_row = 10;
+    clear_command_buffer();
+    print_shell_prompt();
     
     // Main kernel loop
     while (1) {
         // Check for keyboard input (non-blocking)
         if (!keyboard_buffer_empty()) {
             char c = keyboard_getchar();
-            terminal_putchar(c);
+            shell_handle_input(c);
         }
     }
 }
