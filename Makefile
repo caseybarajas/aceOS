@@ -6,17 +6,33 @@ GCC = gcc
 LD = ld
 OBJCOPY = objcopy
 
+# directories
+INCLUDE_DIR = include
+BOOT_DIR = boot
+KERNEL_DIR = kernel
+DRIVERS_DIR = drivers
+
 # nasm flags for bootloader (output raw binary)
 NASMFLAGS_BOOT = -f bin -o boot.bin
+NASMFLAGS_INT = -f elf32 -o kernel/interrupt.o
 
 # gcc flags for kernel - we're targeting flat binary for simplicity
-CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -c -o kernel.o
+CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -c -I$(INCLUDE_DIR)
 LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 
 # files
-BOOT_SRC = boot.asm
-KERNEL_C_SRC = kernel.c
-KERNEL_OBJ = kernel.o
+BOOT_SRC = $(BOOT_DIR)/boot.asm
+KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c
+DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c
+INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
+
+# objects
+KERNEL_OBJS = $(KERNEL_SRCS:.c=.o)
+DRIVER_OBJS = $(DRIVER_SRCS:.c=.o)
+INT_OBJ = $(KERNEL_DIR)/interrupt.o
+ALL_OBJS = $(KERNEL_OBJS) $(DRIVER_OBJS) $(INT_OBJ)
+
+# output files
 KERNEL_BIN = kernel.bin
 OS_IMAGE = os_image.img
 
@@ -27,13 +43,17 @@ all: $(OS_IMAGE)
 boot.bin: $(BOOT_SRC)
 	$(NASM) $(NASMFLAGS_BOOT) $(BOOT_SRC)
 
-# build the c kernel object file
-$(KERNEL_OBJ): $(KERNEL_C_SRC)
-	$(GCC) $(CFLAGS) $(KERNEL_C_SRC)
+# build the interrupt assembly file
+$(INT_OBJ): $(INT_ASM_SRC)
+	$(NASM) $(NASMFLAGS_INT) $(INT_ASM_SRC)
 
-# link the c kernel object to a flat binary
-$(KERNEL_BIN): $(KERNEL_OBJ)
-	$(LD) $(LDFLAGS_KERNEL) $(KERNEL_OBJ)
+# build the c kernel and driver object files
+%.o: %.c
+	$(GCC) $(CFLAGS) -o $@ $<
+
+# link the objects to a flat binary
+$(KERNEL_BIN): $(ALL_OBJS)
+	$(LD) $(LDFLAGS_KERNEL) $(ALL_OBJS)
 
 # create the final os image (bootloader + kernel)
 $(OS_IMAGE): boot.bin $(KERNEL_BIN)
@@ -48,7 +68,7 @@ $(OS_IMAGE): boot.bin $(KERNEL_BIN)
 
 # clean up build files
 clean:
-	rm -f boot.bin $(KERNEL_OBJ) $(KERNEL_BIN) $(OS_IMAGE) *.o
+	rm -f boot.bin $(ALL_OBJS) $(KERNEL_BIN) $(OS_IMAGE) *.o
 
 # rule to run with qemu
 run:
