@@ -1,12 +1,11 @@
-version: '3'
-
 services:
   caseyos-dev:
     build: 
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/caseyos
+      - .:/caseyos:rw
+    user: root
     working_dir: /caseyos
     tty: true
     stdin_open: true 

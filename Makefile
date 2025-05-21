@@ -58,13 +58,16 @@ $(KERNEL_BIN): $(ALL_OBJS)
 # create the final os image (bootloader + kernel)
 $(OS_IMAGE): boot.bin $(KERNEL_BIN)
 	@echo "Creating OS disk image..."
+	# Ensure our current directory is writable
+	touch ./test_perm && rm -f ./test_perm || (echo "Current directory not writable!" && exit 1)
 	# Create an empty 1.44MB floppy disk image (512 bytes/sector × 2880 sectors = 1.44MB)
-	dd if=/dev/zero of=$(OS_IMAGE) bs=512 count=2880
+	dd if=/dev/zero of=$(OS_IMAGE) bs=512 count=2880 || (echo "Failed to create image file"; exit 1)
 	# Write bootloader to sector 1 (the first sector, 512 bytes) without overwriting the entire image
-	dd if=boot.bin of=$(OS_IMAGE) conv=notrunc
+	dd if=boot.bin of=$(OS_IMAGE) conv=notrunc || (echo "Failed to write bootloader"; exit 1)
 	# Write kernel starting at sector 2 (seek=1 means skip 1 sector, which is 512 bytes)
 	# The bootloader will load this kernel from sector 2 into memory
-	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) seek=1 conv=notrunc
+	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) seek=1 conv=notrunc || (echo "Failed to write kernel"; exit 1)
+	@echo "OS image created successfully!"
 
 # clean up build files
 clean:
