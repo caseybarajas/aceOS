@@ -16,6 +16,4 @@ if %ERRORLEVEL% neq 0 (
 echo Build successful! Running QEMU...
 
 REM Run QEMU with debugging enabled
-qemu-system-i386 -fda os_image.img -monitor stdio -no-reboot
-
-echo If you want to exit QEMU, press Ctrl+Alt+2, then type 'quit' and press Enter 
+qemu-system-i386 -drive file=os_image.img,format=raw,index=0,if=floppy -no-reboot
