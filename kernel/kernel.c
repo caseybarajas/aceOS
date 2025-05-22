@@ -5,6 +5,7 @@
 #include "idt.h"
 #include "isr.h"
 #include "keyboard.h"
+#include "serial.h"  // Include the serial driver
 #include "libc/libc.h"
 
 // Define constants for video memory and display attributes
@@ -129,6 +130,9 @@ void print_shell_prompt() {
 
 // Process and execute the command
 void process_command(const char* command) {
+    serial_write_string("Processing command: ");
+    serial_write_string(command);
+
     // Add to history if not empty
     if (command_length > 0) {
         // Copy command to history
@@ -175,6 +179,10 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("echo     - Echo text to screen", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("debug    - Send test message to serial debug port", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -190,6 +198,34 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 0;
         k_print_string(command + 5, WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+    else if (strcmp(command, "debug") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Sending debug information to serial port...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Send debug info to serial port
+        debug_println("===== DEBUG INFO =====");
+        debug_print("OS Version: ");
+        debug_println("aceOS v0.1");
+        debug_print("Memory at 0x10000: Kernel loaded (");
+        serial_write_dec(60);
+        debug_println(" sectors)");
+        
+        // Get some register values to show
+        uint32_t esp;
+        asm volatile("mov %%esp, %0" : "=r" (esp));
+        debug_print("ESP: 0x");
+        serial_write_hex(esp);
+        debug_println("");
+        
+        // Show memory usage (simplified)
+        debug_println("Memory Map:");
+        debug_println("0x00000000 - 0x000003FF: Real Mode IVT");
+        debug_println("0x00000400 - 0x000004FF: BIOS Data Area");
+        debug_println("0x00007C00 - 0x00007DFF: Our Bootloader");
+        debug_println("0x00010000 - 0x0001FFFF: Our Kernel");
+        debug_println("=====================");
     }
     else if (command_length > 0) {
         cursor_row++;
@@ -251,29 +287,31 @@ void shell_handle_input(char c) {
     terminal_putchar(c);
 }
 
-// Entry point for the kernel - called from bootloader
+// Main kernel function
 void kernel_main() {
     // Clear screen
     clear_screen();
     
+    // Initialize serial port
+    serial_init();
+    serial_write_string("Serial port initialized");
+
     k_print_string("*** Kernel Loaded Successfully! ***", WHITE_ON_BLACK, 0, 0);
+    serial_write_string("Kernel loaded successfully!");
     
     // Initialize interrupt system
-    k_print_string("Initializing interrupt system...", WHITE_ON_BLACK, 1, 0);
+    serial_write_string("Initializing interrupt system...");
     idt_init();     // Set up and load the IDT
+    serial_write_string("Initializing service routines...");
     isr_init();     // Set up interrupt service routines
-    k_print_string("Interrupt system initialized!", WHITE_ON_BLACK, 2, 0);
     
     // Initialize keyboard
     keyboard_init();
-    k_print_string("Keyboard initialized", WHITE_ON_BLACK, 3, 0);
-    
+    serial_write_string("Keyboard initialized");
+
     // Enable interrupts
     asm volatile("sti");
-    
-    k_print_string("Interrupts enabled", WHITE_ON_BLACK, 4, 0);
-
-	clear_screen();
+    serial_write_string("Interrupts enabled");
 
     // Initialize C standard library
     libc_init();

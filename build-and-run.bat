@@ -16,4 +16,4 @@ if %ERRORLEVEL% neq 0 (
 echo Build successful! Running QEMU...
 
 REM Run QEMU with debugging enabled
-qemu-system-i386 -drive file=os_image.img,format=raw,index=0,if=floppy -no-reboot
+qemu-system-i386 -drive file=os_image.img,format=raw,index=0,if=floppy -no-reboot -serial stdio

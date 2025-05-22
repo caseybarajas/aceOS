@@ -24,7 +24,7 @@ LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 # files
 BOOT_SRC = $(BOOT_DIR)/boot.asm
 KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c
-DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c
+DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c
 INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
 LIBC_SRCS = $(LIBC_DIR)/string.c $(LIBC_DIR)/stdio.c $(LIBC_DIR)/stdlib.c $(LIBC_DIR)/libc.c
 
