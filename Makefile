@@ -18,13 +18,13 @@ NASMFLAGS_BOOT = -f bin -o boot.bin
 NASMFLAGS_INT = -f elf32 -o kernel/interrupt.o
 
 # gcc flags for kernel - we're targeting flat binary for simplicity
-CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -c -I$(INCLUDE_DIR)
+CFLAGS = -ffreestanding -nostdlib -m32 -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -c -I$(INCLUDE_DIR) -D__GNUC__
 LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 
 # files
 BOOT_SRC = $(BOOT_DIR)/boot.asm
 KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c
-DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c
+DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c $(DRIVERS_DIR)/fs.c
 INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
 LIBC_SRCS = $(LIBC_DIR)/string.c $(LIBC_DIR)/stdio.c $(LIBC_DIR)/stdlib.c $(LIBC_DIR)/libc.c
 
@@ -76,7 +76,7 @@ clean:
 # rule to run with qemu
 run:
 	@if [ -f /.dockerenv ]; then \
-		qemu-system-i386 -display curses -fda $(OS_IMAGE); \
+		qemu-system-i386 -fda $(OS_IMAGE); \
 	else \
 		qemu-system-i386 -fda $(OS_IMAGE); \
 	fi

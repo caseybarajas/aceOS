@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "serial.h"  // Include the serial driver
 #include "libc/libc.h"
+#include "fs.h"      // Include our new filesystem
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -122,7 +123,7 @@ void update_cursor() {
 
 // Print the shell prompt
 void print_shell_prompt() {
-	cursor_row++;
+    cursor_row++;
     k_print_string(SHELL_PROMPT, WHITE_ON_BLACK, cursor_row, 0);
     cursor_col = sizeof(SHELL_PROMPT) - 1;  // Move cursor after prompt
     update_cursor();
@@ -183,6 +184,34 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("debug    - Send test message to serial debug port", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("ls       - List files in directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("mkdir    - Create a directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("touch    - Create an empty file", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("cat      - Display file contents", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("rm       - Remove file or directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("write    - Write content to a file", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("fsinfo   - Display filesystem information", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -212,12 +241,8 @@ void execute_command(const char* command) {
         serial_write_dec(60);
         debug_println(" sectors)");
         
-        // Get some register values to show
-        uint32_t esp;
-        asm volatile("mov %%esp, %0" : "=r" (esp));
-        debug_print("ESP: 0x");
-        serial_write_hex(esp);
-        debug_println("");
+        // Stack pointer info
+        debug_println("Stack pointer is in kernel space");
         
         // Show memory usage (simplified)
         debug_println("Memory Map:");
@@ -226,6 +251,162 @@ void execute_command(const char* command) {
         debug_println("0x00007C00 - 0x00007DFF: Our Bootloader");
         debug_println("0x00010000 - 0x0001FFFF: Our Kernel");
         debug_println("=====================");
+    }
+    else if (strcmp(command, "ls") == 0 || strncmp(command, "ls ", 3) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Get path parameter if any
+        const char* path = "/";
+        if (strlen(command) > 3) {
+            path = command + 3;
+        }
+        
+        // Buffer to hold directory listing
+        char buffer[1024];
+        int result = fs_list_dir(path, buffer, sizeof(buffer));
+        
+        if (result >= 0) {
+            // Successfully listed directory, display results
+            k_print_string(buffer, WHITE_ON_BLACK, cursor_row, cursor_col);
+            
+            // If buffer was empty, show message
+            if (result == 0) {
+                k_print_string("(directory is empty)", WHITE_ON_BLACK, cursor_row, cursor_col);
+            }
+        } else {
+            // Error occurred
+            k_print_string("Error: Could not list directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strncmp(command, "mkdir ", 6) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Get the directory path
+        const char* path = command + 6;
+        
+        // Create the directory
+        int result = fs_mkdir(path);
+        
+        if (result == 0) {
+            k_print_string("Directory created successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
+        } else {
+            k_print_string("Error: Could not create directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strncmp(command, "touch ", 6) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Get the file path
+        const char* path = command + 6;
+        
+        // Create an empty file
+        int result = fs_create(path, 0);
+        
+        if (result == 0) {
+            k_print_string("File created successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
+        } else {
+            k_print_string("Error: Could not create file", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strncmp(command, "cat ", 4) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Get the file path
+        const char* path = command + 4;
+        
+        // Buffer to hold file content
+        char buffer[1024];
+        int bytes_read = fs_read(path, buffer, sizeof(buffer) - 1);
+        
+        if (bytes_read >= 0) {
+            // Null terminate the buffer
+            buffer[bytes_read] = '\0';
+            
+            // Display file content
+            k_print_string("File content:", WHITE_ON_BLACK, cursor_row, cursor_col);
+            cursor_row++;
+            
+            if (bytes_read > 0) {
+                k_print_string(buffer, WHITE_ON_BLACK, cursor_row, cursor_col);
+            } else {
+                k_print_string("(empty file)", WHITE_ON_BLACK, cursor_row, cursor_col);
+            }
+        } else {
+            k_print_string("Error: Could not read file", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strncmp(command, "rm ", 3) == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Get the path
+        const char* path = command + 3;
+        
+        // Delete the file or directory
+        int result = fs_delete(path);
+        
+        if (result == 0) {
+            k_print_string("File or directory deleted successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
+        } else {
+            k_print_string("Error: Could not delete file or directory", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strncmp(command, "write ", 6) == 0) {
+        // Command format: write filepath content
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Extract filepath
+        char filepath[FS_MAX_PATH_LEN] = {0};
+        const char* content_start = NULL;
+        int filepath_len = 0;
+        
+        // Skip "write " prefix
+        const char* cmd_ptr = command + 6;
+        
+        // Skip any spaces
+        while (*cmd_ptr == ' ' && *cmd_ptr != '\0') {
+            cmd_ptr++;
+        }
+        
+        // Extract filepath (until next space)
+        while (*cmd_ptr != ' ' && *cmd_ptr != '\0' && filepath_len < FS_MAX_PATH_LEN - 1) {
+            filepath[filepath_len++] = *cmd_ptr++;
+        }
+        
+        // Skip any spaces after filepath
+        while (*cmd_ptr == ' ' && *cmd_ptr != '\0') {
+            cmd_ptr++;
+        }
+        
+        // Set content pointer
+        content_start = cmd_ptr;
+        
+        if (filepath_len > 0 && *content_start != '\0') {
+            // Write content to the file
+            int result = fs_write(filepath, content_start, strlen(content_start));
+            
+            if (result == 0) {
+                k_print_string("File written successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
+            } else {
+                k_print_string("Error: Could not write to file", WHITE_ON_BLACK, cursor_row, cursor_col);
+            }
+        } else {
+            k_print_string("Usage: write filepath content", WHITE_ON_BLACK, cursor_row, cursor_col);
+        }
+    }
+    else if (strcmp(command, "fsinfo") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Print filesystem info to serial port (it's more useful there)
+        fs_print_stats();
+        
+        k_print_string("Filesystem information printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (command_length > 0) {
         cursor_row++;
@@ -309,12 +490,25 @@ void kernel_main() {
     keyboard_init();
     serial_write_string("Keyboard initialized");
 
-    // Enable interrupts
-    asm volatile("sti");
+    // Enable interrupts (using inline assembly)
+#ifdef __GNUC__
+    __asm__ __volatile__("sti");
+#else
+    // Alternative method for non-GCC compilers
+    #if defined(_MSC_VER)
+    __asm { sti }
+    #else
+    // Just a placeholder, not actually enabling interrupts
+    #endif
+#endif
     serial_write_string("Interrupts enabled");
 
     // Initialize C standard library
     libc_init();
+    
+    // Initialize filesystem
+    fs_init();
+    serial_write_string("Filesystem initialized");
 
     // Keyboard input demo message
     k_print_string("aceOS Shell v0.1", WHITE_ON_BLACK, 0, 0);
