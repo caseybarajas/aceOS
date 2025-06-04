@@ -65,6 +65,9 @@ void fs_init() {
     fs.directories[0].parent_dir = 0; // Root is its own parent
     fs.dir_count = 1;
     
+    // Initialize current directory
+    fs_init_current_dir();
+    
     fs.initialized = 1;
     debug_println("Filesystem initialized successfully");
 }
@@ -191,6 +194,9 @@ int fs_mkdir(const char* path) {
         return -1;
     }
     
+    debug_print("Creating directory: ");
+    debug_println(path);
+    
     // Check if directory already exists
     int existing = fs_find(path);
     if (existing >= 0) {
@@ -204,6 +210,10 @@ int fs_mkdir(const char* path) {
         debug_println("Parent directory not found");
         return -1;
     }
+    
+    debug_print("Parent directory index: ");
+    serial_write_dec(parent_dir);
+    debug_println("");
     
     // Check if we've reached the maximum number of directories
     if (fs.dir_count >= FS_MAX_DIRECTORIES) {
@@ -221,6 +231,9 @@ int fs_mkdir(const char* path) {
     char dir_name[FS_MAX_FILENAME_LEN];
     fs_get_filename(path, dir_name);
     
+    debug_print("Directory name: ");
+    debug_println(dir_name);
+    
     // Create file entry for the directory
     uint32_t file_idx = fs.file_count++;
     strncpy(fs.files[file_idx].name, dir_name, FS_MAX_FILENAME_LEN);
@@ -229,13 +242,25 @@ int fs_mkdir(const char* path) {
     fs.files[file_idx].parent_dir = parent_dir;
     fs.files[file_idx].creation_time = 0; // TODO: Implement a real timestamp
     
+    debug_print("Created file entry at index: ");
+    serial_write_dec(file_idx);
+    debug_println("");
+    
     // Add the file entry to the parent directory
     fs.directories[parent_dir].files[fs.directories[parent_dir].file_count++] = file_idx;
+    
+    debug_print("Added to parent directory, new file count: ");
+    serial_write_dec(fs.directories[parent_dir].file_count);
+    debug_println("");
     
     // Create directory entry
     uint32_t dir_idx = fs.dir_count++;
     strncpy(fs.directories[dir_idx].name, dir_name, FS_MAX_FILENAME_LEN);
     fs.directories[dir_idx].parent_dir = parent_dir;
+    
+    debug_print("Created directory entry at index: ");
+    serial_write_dec(dir_idx);
+    debug_println("");
     
     debug_println("Directory created successfully");
     return 0;
@@ -505,6 +530,13 @@ int fs_list_dir(const char* path, char* buffer, uint32_t buffer_size) {
         }
     }
     
+    // Debug output
+    debug_print("Listing directory index: ");
+    serial_write_dec(dir_idx);
+    debug_print(" with file count: ");
+    serial_write_dec(fs.directories[dir_idx].file_count);
+    debug_println("");
+    
     // Clear the buffer
     buffer[0] = '\0';
     
@@ -512,6 +544,13 @@ int fs_list_dir(const char* path, char* buffer, uint32_t buffer_size) {
     uint32_t offset = 0;
     for (uint32_t i = 0; i < fs.directories[dir_idx].file_count; i++) {
         uint32_t file_idx = fs.directories[dir_idx].files[i];
+        
+        // Debug output
+        debug_print("File ");
+        serial_write_dec(i);
+        debug_print(": ");
+        debug_print(fs.files[file_idx].name);
+        debug_println("");
         
         // Get type string
         const char* type_str = (fs.files[file_idx].type == FS_TYPE_DIRECTORY) ? "DIR" : "FILE";
@@ -596,4 +635,282 @@ void fs_print_stats() {
     debug_print("  Total file size: ");
     serial_write_dec(total_size);
     debug_print(" bytes\n");
+}
+
+// Global current directory path
+static char current_directory[FS_MAX_PATH_LEN] = "/";
+
+// Initialize current directory to root
+void fs_init_current_dir() {
+    strcpy(current_directory, "/");
+}
+
+// Get current directory
+char* fs_get_current_dir() {
+    return current_directory;
+}
+
+// Change current directory
+int fs_change_dir(const char* path) {
+    if (!fs.initialized) {
+        debug_println("Filesystem not initialized");
+        return -1;
+    }
+    
+    // Handle absolute paths
+    char target_path[FS_MAX_PATH_LEN];
+    if (path[0] == '/') {
+        strncpy(target_path, path, FS_MAX_PATH_LEN);
+    } else {
+        // Handle relative paths
+        if (strcmp(current_directory, "/") == 0) {
+            snprintf(target_path, FS_MAX_PATH_LEN, "/%s", path);
+        } else {
+            snprintf(target_path, FS_MAX_PATH_LEN, "%s/%s", current_directory, path);
+        }
+    }
+    
+    // Handle special cases
+    if (strcmp(path, ".") == 0) {
+        return 0; // Stay in current directory
+    }
+    
+    if (strcmp(path, "..") == 0) {
+        // Go to parent directory
+        if (strcmp(current_directory, "/") == 0) {
+            return 0; // Already at root
+        }
+        
+        // Find last slash
+        char* last_slash = strrchr(current_directory, '/');
+        if (last_slash == current_directory) {
+            // Parent is root
+            strcpy(current_directory, "/");
+        } else {
+            // Truncate at last slash
+            *last_slash = '\0';
+        }
+        return 0;
+    }
+    
+    // Check if target path is a directory
+    if (strcmp(target_path, "/") == 0) {
+        strcpy(current_directory, "/");
+        return 0;
+    }
+    
+    int file_idx = fs_find(target_path);
+    if (file_idx < 0) {
+        debug_println("Directory not found");
+        return -1;
+    }
+    
+    if (fs.files[file_idx].type != FS_TYPE_DIRECTORY) {
+        debug_println("Not a directory");
+        return -1;
+    }
+    
+    // Update current directory
+    strncpy(current_directory, target_path, FS_MAX_PATH_LEN);
+    return 0;
+}
+
+// Copy a file
+int fs_copy(const char* src_path, const char* dest_path) {
+    if (!fs.initialized) {
+        debug_println("Filesystem not initialized");
+        return -1;
+    }
+    
+    // Find source file
+    int src_idx = fs_find(src_path);
+    if (src_idx < 0) {
+        debug_println("Source file not found");
+        return -1;
+    }
+    
+    // Check if source is a file
+    if (fs.files[src_idx].type != FS_TYPE_FILE) {
+        debug_println("Source is not a file");
+        return -1;
+    }
+    
+    // Check if destination already exists
+    if (fs_find(dest_path) >= 0) {
+        debug_println("Destination already exists");
+        return -1;
+    }
+    
+    // Create destination file
+    int result = fs_create(dest_path, fs.files[src_idx].size);
+    if (result != 0) {
+        debug_println("Failed to create destination file");
+        return -1;
+    }
+    
+    // Copy data if source has data
+    if (fs.files[src_idx].data_pointer != 0 && fs.files[src_idx].size > 0) {
+        void* data = malloc(fs.files[src_idx].size);
+        if (data == NULL) {
+            debug_println("Failed to allocate memory for copy");
+            fs_delete(dest_path);
+            return -1;
+        }
+        
+        // Read from source
+        memcpy(data, (void*)fs.files[src_idx].data_pointer, fs.files[src_idx].size);
+        
+        // Write to destination
+        result = fs_write(dest_path, data, fs.files[src_idx].size);
+        
+        free(data);
+        
+        if (result != 0) {
+            debug_println("Failed to write to destination file");
+            fs_delete(dest_path);
+            return -1;
+        }
+    }
+    
+    debug_println("File copied successfully");
+    return 0;
+}
+
+// Move/rename a file
+int fs_move(const char* src_path, const char* dest_path) {
+    if (!fs.initialized) {
+        debug_println("Filesystem not initialized");
+        return -1;
+    }
+    
+    // Copy the file first
+    int result = fs_copy(src_path, dest_path);
+    if (result != 0) {
+        return -1;
+    }
+    
+    // Delete the source file
+    result = fs_delete(src_path);
+    if (result != 0) {
+        debug_println("Failed to delete source file");
+        fs_delete(dest_path); // Clean up destination
+        return -1;
+    }
+    
+    debug_println("File moved successfully");
+    return 0;
+}
+
+// Find files by name pattern (simple search)
+int fs_find_by_name(const char* name, char* results, uint32_t buffer_size) {
+    if (!fs.initialized) {
+        debug_println("Filesystem not initialized");
+        return -1;
+    }
+    
+    results[0] = '\0';
+    uint32_t offset = 0;
+    int found_count = 0;
+    
+    // Search all files
+    for (uint32_t i = 0; i < fs.file_count; i++) {
+        if (fs.files[i].name[0] != '\0' && strstr(fs.files[i].name, name) != NULL) {
+            // Found a match
+            const char* type_str = (fs.files[i].type == FS_TYPE_DIRECTORY) ? "DIR" : "FILE";
+            
+            int written = snprintf(results + offset, buffer_size - offset,
+                                  "%s (%s)\n", fs.files[i].name, type_str);
+            
+            if (written < 0 || (uint32_t)written >= buffer_size - offset) {
+                break; // Buffer full
+            }
+            
+            offset += written;
+            found_count++;
+        }
+    }
+    
+    if (found_count == 0) {
+        strncpy(results, "No files found matching pattern\n", buffer_size);
+    }
+    
+    return found_count;
+}
+
+// Generate tree view of directory structure
+void fs_tree(const char* path, char* buffer, uint32_t buffer_size, int depth) {
+    if (!fs.initialized || depth > 10) { // Prevent infinite recursion
+        return;
+    }
+    
+    // Find directory
+    uint32_t dir_idx = 0;
+    if (!(path == NULL || path[0] == '\0' || (path[0] == '/' && path[1] == '\0'))) {
+        int file_idx = fs_find(path);
+        if (file_idx < 0 || fs.files[file_idx].type != FS_TYPE_DIRECTORY) {
+            return;
+        }
+        
+        // Find directory entry
+        for (uint32_t i = 0; i < fs.dir_count; i++) {
+            if (strcmp(fs.directories[i].name, fs.files[file_idx].name) == 0 && 
+                fs.directories[i].parent_dir == fs.files[file_idx].parent_dir) {
+                dir_idx = i;
+                break;
+            }
+        }
+    }
+    
+    // Add indentation
+    uint32_t offset = strlen(buffer);
+    for (int i = 0; i < depth; i++) {
+        if (offset < buffer_size - 3) {
+            strcat(buffer, "  ");
+            offset += 2;
+        }
+    }
+    
+    // Add directory name
+    if (depth == 0) {
+        if (offset < buffer_size - 10) {
+            strcat(buffer, "/\n");
+        }
+    }
+    
+    // List files in directory
+    for (uint32_t i = 0; i < fs.directories[dir_idx].file_count; i++) {
+        uint32_t file_idx = fs.directories[dir_idx].files[i];
+        
+        // Add indentation
+        offset = strlen(buffer);
+        for (int j = 0; j < depth + 1; j++) {
+            if (offset < buffer_size - 3) {
+                strcat(buffer, "  ");
+                offset += 2;
+            }
+        }
+        
+        // Add file/directory name
+        offset = strlen(buffer);
+        if (fs.files[file_idx].type == FS_TYPE_DIRECTORY) {
+            if (offset < buffer_size - strlen(fs.files[file_idx].name) - 5) {
+                strcat(buffer, fs.files[file_idx].name);
+                strcat(buffer, "/\n");
+                
+                // Recursively add subdirectory contents
+                char subdir_path[FS_MAX_PATH_LEN];
+                if (strcmp(path, "/") == 0) {
+                    snprintf(subdir_path, FS_MAX_PATH_LEN, "/%s", fs.files[file_idx].name);
+                } else {
+                    snprintf(subdir_path, FS_MAX_PATH_LEN, "%s/%s", path, fs.files[file_idx].name);
+                }
+                fs_tree(subdir_path, buffer, buffer_size, depth + 1);
+            }
+        } else {
+            if (offset < buffer_size - strlen(fs.files[file_idx].name) - 3) {
+                strcat(buffer, fs.files[file_idx].name);
+                strcat(buffer, "\n");
+            }
+        }
+    }
 } 

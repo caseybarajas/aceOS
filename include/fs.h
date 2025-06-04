@@ -93,4 +93,13 @@ int fs_find(const char* path);
 // Parse a path into components
 void fs_parse_path(const char* path, char* parts[], int* part_count);
 
+// Additional filesystem operations
+int fs_copy(const char* src_path, const char* dest_path);
+int fs_move(const char* src_path, const char* dest_path);
+int fs_find_by_name(const char* name, char* results, uint32_t buffer_size);
+void fs_tree(const char* path, char* buffer, uint32_t buffer_size, int depth);
+char* fs_get_current_dir();
+int fs_change_dir(const char* path);
+void fs_init_current_dir();
+
 #endif // FS_H 
