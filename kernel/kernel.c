@@ -14,6 +14,7 @@
 #include "disk.h"
 #include "utils.h"
 #include "syscall.h"
+#include "graphics.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -276,6 +277,14 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("syscall-stats - Show system call statistics", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("graphics - Demo VGA graphics mode (320x200)", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("gfxtest  - Run graphics test with animations", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -840,6 +849,106 @@ void execute_command(const char* command) {
         
         k_print_string("System call statistics printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
+    else if (strcmp(command, "graphics") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Switching to graphics mode...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Switch to graphics mode and run demo
+        graphics_set_mode_13h();
+        
+        // Add debug output
+        serial_write_string("Mode switch complete, starting drawing...\n");
+        
+        // Try direct VGA memory write first
+        volatile uint8_t* vga = (volatile uint8_t*)0xA0000;
+        for (int i = 0; i < 1000; i++) {
+            vga[i] = 15; // White pixels in top-left
+        }
+        serial_write_string("Direct VGA write test complete\n");
+        
+        // Draw test patterns
+        graphics_clear_screen(COLOR_BLUE);
+        serial_write_string("Screen cleared with blue\n");
+        
+        // Draw some test shapes
+        graphics_draw_rect(50, 50, 100, 60, COLOR_YELLOW);
+        serial_write_string("Drew yellow rectangle\n");
+        graphics_fill_rect(60, 60, 80, 40, COLOR_GREEN);
+        serial_write_string("Drew green filled rectangle\n");
+        graphics_draw_circle(200, 100, 30, COLOR_RED);
+        serial_write_string("Drew red circle\n");
+        graphics_fill_circle(200, 100, 20, COLOR_WHITE);
+        serial_write_string("Drew white filled circle\n");
+        
+        // Draw text
+        graphics_draw_string(10, 10, "aceOS Graphics Mode!", COLOR_WHITE);
+        graphics_draw_string(10, 25, "320x200 256 colors", COLOR_YELLOW);
+        graphics_draw_string(10, 40, "Press any key to return", COLOR_LIGHT_GRAY);
+        
+        // Wait for key press
+        while (keyboard_buffer_empty()) {
+            asm("hlt");
+        }
+        keyboard_getchar(); // consume the key
+        
+        // Return to text mode
+        graphics_set_text_mode();
+        clear_screen();
+        
+        // Reinitialize shell
+        cursor_row = 5;
+        cursor_col = 0;
+        k_print_string("Returned to text mode!", WHITE_ON_BLACK, cursor_row, cursor_col);
+        print_shell_prompt();
+    }
+    else if (strcmp(command, "gfxtest") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Running graphics test...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Switch to graphics mode
+        graphics_set_mode_13h();
+        
+        // Test pixel drawing
+        graphics_clear_screen(COLOR_BLACK);
+        
+        // Draw gradient
+        for (int y = 0; y < 200; y++) {
+            for (int x = 0; x < 320; x++) {
+                uint8_t color = (x + y) / 2;
+                graphics_put_pixel(x, y, color);
+            }
+        }
+        
+        // Draw animated circles
+        for (int frame = 0; frame < 50; frame++) {
+            graphics_fill_circle(160, 100, 50, COLOR_BLACK);
+            graphics_draw_circle(160, 100, frame, COLOR_WHITE);
+            
+            // Simple delay
+            for (volatile int i = 0; i < 100000; i++);
+        }
+        
+        // Draw text
+        graphics_draw_string(100, 90, "Graphics Test Complete!", COLOR_YELLOW);
+        
+        // Wait for key
+        while (keyboard_buffer_empty()) {
+            asm("hlt");
+        }
+        keyboard_getchar();
+        
+        // Return to text mode
+        graphics_set_text_mode();
+        clear_screen();
+        
+        // Reinitialize shell
+        cursor_row = 5;
+        cursor_col = 0;
+        k_print_string("Graphics test completed!", WHITE_ON_BLACK, cursor_row, cursor_col);
+        print_shell_prompt();
+    }
     else if (command_length > 0) {
         cursor_row++;
         cursor_col = 0;
@@ -874,7 +983,7 @@ void terminal_putchar(char c) {
         // Backspace - remove character from buffer  
         // Calculate prompt length: "aceOS " + current_dir + "> "
         char* current_dir = fs_get_current_dir();
-        int prompt_length = 6 + strlen(current_dir) + 3; // "aceOS " + dir + "> "
+        int prompt_length = 6 + strlen(current_dir) + 2; // "aceOS " + dir + "> "
         
         if (cursor_col > prompt_length - 1) {
             cursor_col--;
@@ -971,13 +1080,17 @@ void kernel_main() {
     // Initialize C standard library
     libc_init();
     
+    // Initialize graphics subsystem
+    k_print_string("Initializing graphics subsystem...", WHITE_ON_BLACK, 9, 0);
+    graphics_init();
+    
     // Initialize filesystem
-    k_print_string("Initializing filesystem...", WHITE_ON_BLACK, 9, 0);
+    k_print_string("Initializing filesystem...", WHITE_ON_BLACK, 10, 0);
     fs_init();
     serial_write_string("Filesystem initialized\n");
 
     // Initialize system call interface
-    k_print_string("Initializing system calls...", WHITE_ON_BLACK, 10, 0);
+    k_print_string("Initializing system calls...", WHITE_ON_BLACK, 11, 0);
     syscall_init();
 
     // System ready message

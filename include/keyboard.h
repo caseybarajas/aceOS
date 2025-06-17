@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-#include <stdint.h>
+#include "types.h"
 #include "isr.h"
 
 // Keyboard ports

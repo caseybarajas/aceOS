@@ -1,0 +1,524 @@
+#include "../include/graphics.h"
+#include "../include/io.h"
+#include "../include/serial.h"
+
+// Forward declaration for strlen
+extern int strlen(const char* str);
+
+// Global graphics state
+static graphics_state_t graphics_state;
+
+// Simple 8x8 bitmap font for basic text rendering
+static const uint8_t font_8x8[256][8] = {
+    // ASCII 32 (space)
+    [32] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    // ASCII 33 (!)
+    [33] = { 0x18, 0x3C, 0x3C, 0x18, 0x18, 0x00, 0x18, 0x00 },
+    // ASCII 34 (")
+    [34] = { 0x36, 0x36, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    // ASCII 35 (#)
+    [35] = { 0x36, 0x36, 0x7F, 0x36, 0x7F, 0x36, 0x36, 0x00 },
+    // ASCII 36 ($)
+    [36] = { 0x0C, 0x3E, 0x03, 0x1E, 0x30, 0x1F, 0x0C, 0x00 },
+    // ASCII 37 (%)
+    [37] = { 0x00, 0x63, 0x33, 0x18, 0x0C, 0x66, 0x63, 0x00 },
+    // ASCII 38 (&)
+    [38] = { 0x1C, 0x36, 0x1C, 0x6E, 0x3B, 0x33, 0x6E, 0x00 },
+    // ASCII 39 (')
+    [39] = { 0x06, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 },
+    // ASCII 40 (()
+    [40] = { 0x18, 0x0C, 0x06, 0x06, 0x06, 0x0C, 0x18, 0x00 },
+    // ASCII 41 ())
+    [41] = { 0x06, 0x0C, 0x18, 0x18, 0x18, 0x0C, 0x06, 0x00 },
+    // ASCII 42 (*)
+    [42] = { 0x00, 0x66, 0x3C, 0xFF, 0x3C, 0x66, 0x00, 0x00 },
+    // ASCII 43 (+)
+    [43] = { 0x00, 0x0C, 0x0C, 0x3F, 0x0C, 0x0C, 0x00, 0x00 },
+    // ASCII 44 (,)
+    [44] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x06, 0x00 },
+    // ASCII 45 (-)
+    [45] = { 0x00, 0x00, 0x00, 0x3F, 0x00, 0x00, 0x00, 0x00 },
+    // ASCII 46 (.)
+    [46] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C, 0x00 },
+    // ASCII 47 (/)
+    [47] = { 0x60, 0x30, 0x18, 0x0C, 0x06, 0x03, 0x01, 0x00 },
+    // ASCII 48-57 (0-9)
+    [48] = { 0x3E, 0x63, 0x73, 0x7B, 0x6F, 0x67, 0x3E, 0x00 },
+    [49] = { 0x0C, 0x0E, 0x0C, 0x0C, 0x0C, 0x0C, 0x3F, 0x00 },
+    [50] = { 0x1E, 0x33, 0x30, 0x1C, 0x06, 0x33, 0x3F, 0x00 },
+    [51] = { 0x1E, 0x33, 0x30, 0x1C, 0x30, 0x33, 0x1E, 0x00 },
+    [52] = { 0x38, 0x3C, 0x36, 0x33, 0x7F, 0x30, 0x78, 0x00 },
+    [53] = { 0x3F, 0x03, 0x1F, 0x30, 0x30, 0x33, 0x1E, 0x00 },
+    [54] = { 0x1C, 0x06, 0x03, 0x1F, 0x33, 0x33, 0x1E, 0x00 },
+    [55] = { 0x3F, 0x33, 0x30, 0x18, 0x0C, 0x0C, 0x0C, 0x00 },
+    [56] = { 0x1E, 0x33, 0x33, 0x1E, 0x33, 0x33, 0x1E, 0x00 },
+    [57] = { 0x1E, 0x33, 0x33, 0x3E, 0x30, 0x18, 0x0E, 0x00 },
+    // ASCII 58-64
+    [58] = { 0x00, 0x0C, 0x0C, 0x00, 0x00, 0x0C, 0x0C, 0x00 },
+    [59] = { 0x00, 0x0C, 0x0C, 0x00, 0x00, 0x0C, 0x06, 0x00 },
+    [60] = { 0x18, 0x0C, 0x06, 0x03, 0x06, 0x0C, 0x18, 0x00 },
+    [61] = { 0x00, 0x00, 0x3F, 0x00, 0x00, 0x3F, 0x00, 0x00 },
+    [62] = { 0x06, 0x0C, 0x18, 0x30, 0x18, 0x0C, 0x06, 0x00 },
+    [63] = { 0x1E, 0x33, 0x30, 0x18, 0x0C, 0x00, 0x0C, 0x00 },
+    [64] = { 0x3E, 0x63, 0x7B, 0x7B, 0x7B, 0x03, 0x1E, 0x00 },
+    // ASCII 65-90 (A-Z)
+    [65] = { 0x0C, 0x1E, 0x33, 0x33, 0x3F, 0x33, 0x33, 0x00 },
+    [66] = { 0x3F, 0x66, 0x66, 0x3E, 0x66, 0x66, 0x3F, 0x00 },
+    [67] = { 0x3C, 0x66, 0x03, 0x03, 0x03, 0x66, 0x3C, 0x00 },
+    [68] = { 0x1F, 0x36, 0x66, 0x66, 0x66, 0x36, 0x1F, 0x00 },
+    [69] = { 0x7F, 0x46, 0x16, 0x1E, 0x16, 0x46, 0x7F, 0x00 },
+    [70] = { 0x7F, 0x46, 0x16, 0x1E, 0x16, 0x06, 0x0F, 0x00 },
+    [71] = { 0x3C, 0x66, 0x03, 0x03, 0x73, 0x66, 0x7C, 0x00 },
+    [72] = { 0x33, 0x33, 0x33, 0x3F, 0x33, 0x33, 0x33, 0x00 },
+    [73] = { 0x1E, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x1E, 0x00 },
+    [74] = { 0x78, 0x30, 0x30, 0x30, 0x33, 0x33, 0x1E, 0x00 },
+    [75] = { 0x67, 0x66, 0x36, 0x1E, 0x36, 0x66, 0x67, 0x00 },
+    [76] = { 0x0F, 0x06, 0x06, 0x06, 0x46, 0x66, 0x7F, 0x00 },
+    [77] = { 0x63, 0x77, 0x7F, 0x7F, 0x6B, 0x63, 0x63, 0x00 },
+    [78] = { 0x63, 0x67, 0x6F, 0x7B, 0x73, 0x63, 0x63, 0x00 },
+    [79] = { 0x1C, 0x36, 0x63, 0x63, 0x63, 0x36, 0x1C, 0x00 },
+    [80] = { 0x3F, 0x66, 0x66, 0x3E, 0x06, 0x06, 0x0F, 0x00 },
+    [81] = { 0x1E, 0x33, 0x33, 0x33, 0x3B, 0x1E, 0x38, 0x00 },
+    [82] = { 0x3F, 0x66, 0x66, 0x3E, 0x36, 0x66, 0x67, 0x00 },
+    [83] = { 0x1E, 0x33, 0x07, 0x0E, 0x38, 0x33, 0x1E, 0x00 },
+    [84] = { 0x3F, 0x2D, 0x0C, 0x0C, 0x0C, 0x0C, 0x1E, 0x00 },
+    [85] = { 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x3F, 0x00 },
+    [86] = { 0x33, 0x33, 0x33, 0x33, 0x33, 0x1E, 0x0C, 0x00 },
+    [87] = { 0x63, 0x63, 0x63, 0x6B, 0x7F, 0x77, 0x63, 0x00 },
+    [88] = { 0x63, 0x63, 0x36, 0x1C, 0x1C, 0x36, 0x63, 0x00 },
+    [89] = { 0x33, 0x33, 0x33, 0x1E, 0x0C, 0x0C, 0x1E, 0x00 },
+    [90] = { 0x7F, 0x63, 0x31, 0x18, 0x4C, 0x66, 0x7F, 0x00 },
+    // ASCII 97-122 (a-z) - simplified lowercase
+    [97] = { 0x00, 0x00, 0x1E, 0x30, 0x3E, 0x33, 0x6E, 0x00 },
+    [98] = { 0x07, 0x06, 0x06, 0x3E, 0x66, 0x66, 0x3B, 0x00 },
+    [99] = { 0x00, 0x00, 0x1E, 0x33, 0x03, 0x33, 0x1E, 0x00 },
+    [100] = { 0x38, 0x30, 0x30, 0x3e, 0x33, 0x33, 0x6E, 0x00 },
+    [101] = { 0x00, 0x00, 0x1E, 0x33, 0x3f, 0x03, 0x1E, 0x00 },
+    [102] = { 0x1C, 0x36, 0x06, 0x0f, 0x06, 0x06, 0x0F, 0x00 },
+    [103] = { 0x00, 0x00, 0x6E, 0x33, 0x33, 0x3E, 0x30, 0x1F },
+    [104] = { 0x07, 0x06, 0x36, 0x6E, 0x66, 0x66, 0x67, 0x00 },
+    [105] = { 0x0C, 0x00, 0x0E, 0x0C, 0x0C, 0x0C, 0x1E, 0x00 },
+    [106] = { 0x30, 0x00, 0x30, 0x30, 0x30, 0x33, 0x33, 0x1E },
+    [107] = { 0x07, 0x06, 0x66, 0x36, 0x1E, 0x36, 0x67, 0x00 },
+    [108] = { 0x0E, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x1E, 0x00 },
+    [109] = { 0x00, 0x00, 0x33, 0x7F, 0x7F, 0x6B, 0x63, 0x00 },
+    [110] = { 0x00, 0x00, 0x1F, 0x33, 0x33, 0x33, 0x33, 0x00 },
+    [111] = { 0x00, 0x00, 0x1E, 0x33, 0x33, 0x33, 0x1E, 0x00 },
+    [112] = { 0x00, 0x00, 0x3B, 0x66, 0x66, 0x3E, 0x06, 0x0F },
+    [113] = { 0x00, 0x00, 0x6E, 0x33, 0x33, 0x3E, 0x30, 0x78 },
+    [114] = { 0x00, 0x00, 0x3B, 0x6E, 0x66, 0x06, 0x0F, 0x00 },
+    [115] = { 0x00, 0x00, 0x3E, 0x03, 0x1E, 0x30, 0x1F, 0x00 },
+    [116] = { 0x08, 0x0C, 0x3E, 0x0C, 0x0C, 0x2C, 0x18, 0x00 },
+    [117] = { 0x00, 0x00, 0x33, 0x33, 0x33, 0x33, 0x6E, 0x00 },
+    [118] = { 0x00, 0x00, 0x33, 0x33, 0x33, 0x1E, 0x0C, 0x00 },
+    [119] = { 0x00, 0x00, 0x63, 0x6B, 0x7F, 0x7F, 0x36, 0x00 },
+    [120] = { 0x00, 0x00, 0x63, 0x36, 0x1C, 0x36, 0x63, 0x00 },
+    [121] = { 0x00, 0x00, 0x33, 0x33, 0x33, 0x3E, 0x30, 0x1F },
+    [122] = { 0x00, 0x00, 0x3F, 0x19, 0x0C, 0x26, 0x3F, 0x00 },
+};
+
+// VGA Mode 13h register values
+static const uint8_t mode13h_regs[] = {
+    // MISC
+    0x63,
+    // SEQ
+    0x03, 0x01, 0x03, 0x00, 0x02,
+    // CRTC
+    0x5F, 0x4F, 0x50, 0x82, 0x54, 0x80, 0xBF, 0x1F,
+    0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x9C, 0x0E, 0x8F, 0x28, 0x40, 0x96, 0xB9, 0xA3,
+    0xFF,
+    // GC
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x0F, 0xFF,
+    // AC
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+    0x41, 0x00, 0x0F, 0x00, 0x00
+};
+
+// Initialize graphics subsystem
+void graphics_init(void) {
+    serial_write_string("Initializing graphics subsystem...\n");
+    
+    graphics_state.framebuffer = (uint8_t*)VGA_MEMORY;
+    graphics_state.current_mode = 3; // Start in text mode
+    graphics_state.foreground_color = COLOR_WHITE;
+    graphics_state.background_color = COLOR_BLACK;
+    
+    serial_write_string("Graphics subsystem initialized\n");
+}
+
+// Set VGA Mode 13h (320x200x256 colors)
+void graphics_set_mode_13h(void) {
+    serial_write_string("Switching to VGA Mode 13h (320x200x256)...\n");
+    
+    // Note: interrupts should be disabled during mode switch
+    
+    // Manual VGA Mode 13h setup (BIOS doesn't work in protected mode)
+    
+    // Set Miscellaneous Register
+    outb(0x3C2, 0x63);
+    
+    // Reset sequencer to ensure clean state
+    outb(0x3C4, 0x00); outb(0x3C5, 0x01);  // Reset - start reset
+    
+    // Set Sequencer registers
+    outb(0x3C4, 0x01); outb(0x3C5, 0x01);  // Clocking Mode
+    outb(0x3C4, 0x02); outb(0x3C5, 0x0F);  // Map Mask - enable all planes
+    outb(0x3C4, 0x03); outb(0x3C5, 0x00);  // Character Map Select
+    outb(0x3C4, 0x04); outb(0x3C5, 0x0E);  // Memory Mode - chain-4, odd/even disable
+    
+    // End reset
+    outb(0x3C4, 0x00); outb(0x3C5, 0x03);  // Reset - end reset
+    
+    // Small delay for stability
+    for (volatile int i = 0; i < 1000; i++);
+    
+    // Unlock CRTC registers 0-7
+    outb(0x3D4, 0x03); outb(0x3D5, 0x80);
+    outb(0x3D4, 0x11); outb(0x3D5, 0x00);
+    
+    // Set CRTC registers for 320x200
+    outb(0x3D4, 0x00); outb(0x3D5, 0x5F);  // Horizontal Total
+    outb(0x3D4, 0x01); outb(0x3D5, 0x4F);  // Horizontal Display End
+    outb(0x3D4, 0x02); outb(0x3D5, 0x50);  // Start Horizontal Blanking
+    outb(0x3D4, 0x03); outb(0x3D5, 0x82);  // End Horizontal Blanking
+    outb(0x3D4, 0x04); outb(0x3D5, 0x54);  // Start Horizontal Retrace
+    outb(0x3D4, 0x05); outb(0x3D5, 0x80);  // End Horizontal Retrace
+    outb(0x3D4, 0x06); outb(0x3D5, 0xBF);  // Vertical Total
+    outb(0x3D4, 0x07); outb(0x3D5, 0x1F);  // Overflow
+    outb(0x3D4, 0x08); outb(0x3D5, 0x00);  // Preset Row Scan
+    outb(0x3D4, 0x09); outb(0x3D5, 0x41);  // Maximum Scan Line
+    outb(0x3D4, 0x0A); outb(0x3D5, 0x00);  // Cursor Start
+    outb(0x3D4, 0x0B); outb(0x3D5, 0x00);  // Cursor End
+    outb(0x3D4, 0x0C); outb(0x3D5, 0x00);  // Start Address High
+    outb(0x3D4, 0x0D); outb(0x3D5, 0x00);  // Start Address Low
+    outb(0x3D4, 0x0E); outb(0x3D5, 0x00);  // Cursor Location High
+    outb(0x3D4, 0x0F); outb(0x3D5, 0x00);  // Cursor Location Low
+    outb(0x3D4, 0x10); outb(0x3D5, 0x9C);  // Vertical Retrace Start
+    outb(0x3D4, 0x11); outb(0x3D5, 0x0E);  // Vertical Retrace End
+    outb(0x3D4, 0x12); outb(0x3D5, 0x8F);  // Vertical Display End
+    outb(0x3D4, 0x13); outb(0x3D5, 0x28);  // Offset
+    outb(0x3D4, 0x14); outb(0x3D5, 0x40);  // Underline Location
+    outb(0x3D4, 0x15); outb(0x3D5, 0x96);  // Start Vertical Blanking
+    outb(0x3D4, 0x16); outb(0x3D5, 0xB9);  // End Vertical Blanking
+    outb(0x3D4, 0x17); outb(0x3D5, 0xA3);  // CRTC Mode Control
+    outb(0x3D4, 0x18); outb(0x3D5, 0xFF);  // Line Compare
+    
+    // Set Graphics Controller registers
+    outb(0x3CE, 0x00); outb(0x3CF, 0x00);  // Set/Reset
+    outb(0x3CE, 0x01); outb(0x3CF, 0x00);  // Enable Set/Reset
+    outb(0x3CE, 0x02); outb(0x3CF, 0x00);  // Color Compare
+    outb(0x3CE, 0x03); outb(0x3CF, 0x00);  // Data Rotate
+    outb(0x3CE, 0x04); outb(0x3CF, 0x00);  // Read Map Select
+    outb(0x3CE, 0x05); outb(0x3CF, 0x40);  // Graphics Mode
+    outb(0x3CE, 0x06); outb(0x3CF, 0x05);  // Miscellaneous
+    outb(0x3CE, 0x07); outb(0x3CF, 0x0F);  // Color Don't Care
+    outb(0x3CE, 0x08); outb(0x3CF, 0xFF);  // Bit Mask
+    
+    // Set Attribute Controller registers - FIXED SEQUENCE
+    // First, ensure we're in a known state
+    inb(0x3DA);  // Reset flip-flop to index state
+    
+    // Set palette registers (0-15)
+    outb(0x3C0, 0x00); outb(0x3C0, 0x00);  // Palette 0
+    outb(0x3C0, 0x01); outb(0x3C0, 0x01);  // Palette 1
+    outb(0x3C0, 0x02); outb(0x3C0, 0x02);  // Palette 2
+    outb(0x3C0, 0x03); outb(0x3C0, 0x03);  // Palette 3
+    outb(0x3C0, 0x04); outb(0x3C0, 0x04);  // Palette 4
+    outb(0x3C0, 0x05); outb(0x3C0, 0x05);  // Palette 5
+    outb(0x3C0, 0x06); outb(0x3C0, 0x06);  // Palette 6
+    outb(0x3C0, 0x07); outb(0x3C0, 0x07);  // Palette 7
+    outb(0x3C0, 0x08); outb(0x3C0, 0x08);  // Palette 8
+    outb(0x3C0, 0x09); outb(0x3C0, 0x09);  // Palette 9
+    outb(0x3C0, 0x0A); outb(0x3C0, 0x0A);  // Palette 10
+    outb(0x3C0, 0x0B); outb(0x3C0, 0x0B);  // Palette 11
+    outb(0x3C0, 0x0C); outb(0x3C0, 0x0C);  // Palette 12
+    outb(0x3C0, 0x0D); outb(0x3C0, 0x0D);  // Palette 13
+    outb(0x3C0, 0x0E); outb(0x3C0, 0x0E);  // Palette 14
+    outb(0x3C0, 0x0F); outb(0x3C0, 0x0F);  // Palette 15
+    
+    // Set attribute controller mode registers
+    outb(0x3C0, 0x10); outb(0x3C0, 0x41);  // Attribute Mode Control
+    outb(0x3C0, 0x11); outb(0x3C0, 0x00);  // Overscan Color
+    outb(0x3C0, 0x12); outb(0x3C0, 0x0F);  // Color Plane Enable
+    outb(0x3C0, 0x13); outb(0x3C0, 0x00);  // Horizontal Pixel Panning
+    outb(0x3C0, 0x14); outb(0x3C0, 0x00);  // Color Select
+    
+    // Enable display and set video enabled
+    inb(0x3DA);  // Reset flip-flop
+    outb(0x3C0, 0x20);  // Enable video output
+    
+    // Another small delay for stability
+    for (volatile int i = 0; i < 1000; i++);
+    
+    graphics_state.current_mode = 13;
+    graphics_state.framebuffer = (uint8_t*)VGA_MEMORY;
+    
+    // Set default palette
+    graphics_set_default_palette();
+    
+    // Clear screen to ensure clean start
+    graphics_clear_screen(COLOR_BLACK);
+    
+    // Note: interrupts should be re-enabled
+    
+    serial_write_string("VGA Mode 13h set successfully using manual registers\n");
+}
+
+// Switch back to text mode
+void graphics_set_text_mode(void) {
+    serial_write_string("Switching back to text mode...\n");
+    
+    // Simple way to switch back to text mode
+    // Note: Would use BIOS interrupt to switch to text mode
+    
+    graphics_state.current_mode = 3;
+    serial_write_string("Text mode restored\n");
+}
+
+// Put a pixel at specified coordinates
+void graphics_put_pixel(int x, int y, uint8_t color) {
+    if (x >= 0 && x < VGA_WIDTH && y >= 0 && y < VGA_HEIGHT) {
+        // Direct write to VGA memory with proper memory barrier
+        volatile uint8_t* vga = (volatile uint8_t*)VGA_MEMORY;
+        int offset = y * VGA_WIDTH + x;
+        
+        // Direct write to VGA memory
+        vga[offset] = color;
+    }
+}
+
+// Get pixel color at specified coordinates
+uint8_t graphics_get_pixel(int x, int y) {
+    if (x >= 0 && x < VGA_WIDTH && y >= 0 && y < VGA_HEIGHT) {
+        return graphics_state.framebuffer[y * VGA_WIDTH + x];
+    }
+    return 0;
+}
+
+// Clear the entire screen with specified color
+void graphics_clear_screen(uint8_t color) {
+    // Direct write to VGA memory with proper synchronization
+    volatile uint8_t* vga = (volatile uint8_t*)VGA_MEMORY;
+    
+    // Clear screen directly
+    for (int i = 0; i < VGA_BUFFER_SIZE; i++) {
+        vga[i] = color;
+    }
+}
+
+// Draw a line using Bresenham's algorithm
+void graphics_draw_line(int x1, int y1, int x2, int y2, uint8_t color) {
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+    
+    // Handle absolute values
+    int abs_dx = (dx < 0) ? -dx : dx;
+    int abs_dy = (dy < 0) ? -dy : dy;
+    
+    int sx = (dx > 0) ? 1 : -1;
+    int sy = (dy > 0) ? 1 : -1;
+    
+    int err = abs_dx - abs_dy;
+    
+    int x = x1;
+    int y = y1;
+    
+    while (1) {
+        graphics_put_pixel(x, y, color);
+        
+        if (x == x2 && y == y2) break;
+        
+        int e2 = 2 * err;
+        
+        if (e2 > -abs_dy) {
+            err -= abs_dy;
+            x += sx;
+        }
+        
+        if (e2 < abs_dx) {
+            err += abs_dx;
+            y += sy;
+        }
+    }
+}
+
+// Draw a rectangle outline
+void graphics_draw_rect(int x, int y, int width, int height, uint8_t color) {
+    // Top and bottom lines
+    for (int i = 0; i < width; i++) {
+        graphics_put_pixel(x + i, y, color);
+        graphics_put_pixel(x + i, y + height - 1, color);
+    }
+    
+    // Left and right lines
+    for (int i = 0; i < height; i++) {
+        graphics_put_pixel(x, y + i, color);
+        graphics_put_pixel(x + width - 1, y + i, color);
+    }
+}
+
+// Fill a rectangle
+void graphics_fill_rect(int x, int y, int width, int height, uint8_t color) {
+    for (int dy = 0; dy < height; dy++) {
+        for (int dx = 0; dx < width; dx++) {
+            graphics_put_pixel(x + dx, y + dy, color);
+        }
+    }
+}
+
+// Draw a circle using midpoint circle algorithm
+void graphics_draw_circle(int cx, int cy, int radius, uint8_t color) {
+    int x = 0;
+    int y = radius;
+    int d = 1 - radius;
+    
+    while (x <= y) {
+        // Draw 8 points for each calculated point
+        graphics_put_pixel(cx + x, cy + y, color);
+        graphics_put_pixel(cx + x, cy - y, color);
+        graphics_put_pixel(cx - x, cy + y, color);
+        graphics_put_pixel(cx - x, cy - y, color);
+        graphics_put_pixel(cx + y, cy + x, color);
+        graphics_put_pixel(cx + y, cy - x, color);
+        graphics_put_pixel(cx - y, cy + x, color);
+        graphics_put_pixel(cx - y, cy - x, color);
+        
+        if (d < 0) {
+            d = d + 2 * x + 3;
+        } else {
+            d = d + 2 * (x - y) + 5;
+            y--;
+        }
+        x++;
+    }
+}
+
+// Fill a circle
+void graphics_fill_circle(int cx, int cy, int radius, uint8_t color) {
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            if (x * x + y * y <= radius * radius) {
+                graphics_put_pixel(cx + x, cy + y, color);
+            }
+        }
+    }
+}
+
+// Draw a character using the bitmap font
+void graphics_draw_char(int x, int y, char c, uint8_t color) {
+    if (c < 0 || c > 255) return;
+    
+    const uint8_t* glyph = font_8x8[(uint8_t)c];
+    
+    // Debug: for letter 'A' (65), let's use a simple test pattern
+    if (c == 'A') {
+        // Simple test pattern: diagonal line
+        uint8_t test_pattern[8] = {
+            0x18,  // 00011000
+            0x3C,  // 00111100
+            0x66,  // 01100110
+            0x66,  // 01100110
+            0x7E,  // 01111110
+            0x66,  // 01100110
+            0x66,  // 01100110
+            0x00   // 00000000
+        };
+        glyph = test_pattern;
+    }
+    
+    for (int row = 0; row < 8; row++) {
+        uint8_t byte = glyph[row];
+        for (int col = 0; col < 8; col++) {
+            if (byte & (0x01 << col)) {
+                graphics_put_pixel(x + col, y + row, color);
+            }
+        }
+    }
+}
+
+// Draw a string
+void graphics_draw_string(int x, int y, const char* str, uint8_t color) {
+    int pos_x = x;
+    
+    while (*str) {
+        if (*str == '\n') {
+            pos_x = x;
+            y += 8;
+        } else {
+            graphics_draw_char(pos_x, y, *str, color);
+            pos_x += 8;
+        }
+        str++;
+    }
+}
+
+// Set a palette color (RGB values 0-63)
+void graphics_set_palette_color(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
+    outb(0x3C8, index);
+    outb(0x3C9, r);
+    outb(0x3C9, g);
+    outb(0x3C9, b);
+}
+
+// Set up default VGA palette
+void graphics_set_default_palette(void) {
+    // Set basic 16 colors
+    graphics_set_palette_color(0, 0, 0, 0);      // Black
+    graphics_set_palette_color(1, 0, 0, 42);     // Blue
+    graphics_set_palette_color(2, 0, 42, 0);     // Green
+    graphics_set_palette_color(3, 0, 42, 42);    // Cyan
+    graphics_set_palette_color(4, 42, 0, 0);     // Red
+    graphics_set_palette_color(5, 42, 0, 42);    // Magenta
+    graphics_set_palette_color(6, 42, 21, 0);    // Brown
+    graphics_set_palette_color(7, 42, 42, 42);   // Light Gray
+    graphics_set_palette_color(8, 21, 21, 21);   // Dark Gray
+    graphics_set_palette_color(9, 21, 21, 63);   // Light Blue
+    graphics_set_palette_color(10, 21, 63, 21);  // Light Green
+    graphics_set_palette_color(11, 21, 63, 63);  // Light Cyan
+    graphics_set_palette_color(12, 63, 21, 21);  // Light Red
+    graphics_set_palette_color(13, 63, 21, 63);  // Light Magenta
+    graphics_set_palette_color(14, 63, 63, 21);  // Yellow
+    graphics_set_palette_color(15, 63, 63, 63);  // White
+    
+    // Fill remaining colors with a gradient
+    for (int i = 16; i < 256; i++) {
+        uint8_t level = (i - 16) * 63 / 239;
+        graphics_set_palette_color(i, level, level, level);
+    }
+}
+
+// State management functions
+void graphics_set_foreground_color(uint8_t color) {
+    graphics_state.foreground_color = color;
+}
+
+void graphics_set_background_color(uint8_t color) {
+    graphics_state.background_color = color;
+}
+
+uint8_t graphics_get_foreground_color(void) {
+    return graphics_state.foreground_color;
+}
+
+uint8_t graphics_get_background_color(void) {
+    return graphics_state.background_color;
+}
+
+// Copy buffer region (for future double buffering)
+void graphics_copy_buffer(uint8_t* src, int src_x, int src_y, int src_width,
+                         int dst_x, int dst_y, int width, int height) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint8_t pixel = src[(src_y + y) * src_width + (src_x + x)];
+            graphics_put_pixel(dst_x + x, dst_y + y, pixel);
+        }
+    }
+}
+
+// Placeholder for double buffering
+void graphics_swap_buffers(void) {
+    // For now, this is a no-op since we're drawing directly to video memory
+    // In the future, this could swap between front and back buffers
+} 

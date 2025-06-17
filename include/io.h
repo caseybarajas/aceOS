@@ -1,7 +1,7 @@
 #ifndef IO_H
 #define IO_H
 
-#include <stdint.h>
+#include "types.h"
 
 // Write a byte to a port
 static inline void outb(uint16_t port, uint8_t value) {

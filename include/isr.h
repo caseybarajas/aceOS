@@ -1,7 +1,7 @@
 #ifndef ISR_H
 #define ISR_H
 
-#include <stdint.h>
+#include "types.h"
 
 // Structure to represent registers during an interrupt
 typedef struct {

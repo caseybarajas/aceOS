@@ -1,7 +1,7 @@
 #ifndef PIC_H
 #define PIC_H
 
-#include <stdint.h>
+#include "types.h"
 #include "io.h"
 
 // PIC ports

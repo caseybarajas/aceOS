@@ -5,7 +5,9 @@
 #define NULL ((void*)0)
 #endif
 
+#ifndef _SIZE_T_DEFINED
 typedef unsigned long size_t;
+#endif
 typedef long ptrdiff_t;
 typedef unsigned int wchar_t;
 

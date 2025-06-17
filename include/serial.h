@@ -1,7 +1,7 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
-#include <stdint.h>
+#include "types.h"
 #include "isr.h"
 
 // Serial port initialization

@@ -1,7 +1,7 @@
 #ifndef IDT_H
 #define IDT_H
 
-#include <stdint.h>
+#include "types.h"
 
 // IDT gate types
 #define IDT_GATE_TASK      0x5
