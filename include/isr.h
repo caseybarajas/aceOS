@@ -63,6 +63,9 @@ extern void isr45();
 extern void isr46();
 extern void isr47();
 
+// System call interrupt
+extern void isr128();
+
 // Function prototypes
 void isr_init();
 void isr_handler(registers_t regs);

@@ -13,6 +13,7 @@
 #include "timer.h"
 #include "disk.h"
 #include "utils.h"
+#include "syscall.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -267,6 +268,14 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("test     - Run system tests", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("syscalls - Test system call interface", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("syscall-stats - Show system call statistics", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -811,6 +820,26 @@ void execute_command(const char* command) {
         cursor_row++;
         k_print_string("System tests completed - check serial output", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
+    else if (strcmp(command, "syscalls") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Testing system calls...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Test system calls
+        test_system_calls();
+        
+        cursor_row++;
+        k_print_string("System call tests completed - check serial output", WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
+    else if (strcmp(command, "syscall-stats") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        
+        // Print system call statistics to serial
+        syscall_print_stats();
+        
+        k_print_string("System call statistics printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
     else if (command_length > 0) {
         cursor_row++;
         cursor_col = 0;
@@ -947,10 +976,14 @@ void kernel_main() {
     fs_init();
     serial_write_string("Filesystem initialized\n");
 
+    // Initialize system call interface
+    k_print_string("Initializing system calls...", WHITE_ON_BLACK, 10, 0);
+    syscall_init();
+
     // System ready message
-    k_print_string("Enhanced system initialization complete!", WHITE_ON_BLACK, 10, 0);
-    k_print_string("aceOS Enhanced Shell v2.0", WHITE_ON_BLACK, 11, 0);
-    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 12, 0);
+    k_print_string("Enhanced system initialization complete!", WHITE_ON_BLACK, 11, 0);
+    k_print_string("aceOS Enhanced Shell v2.0", WHITE_ON_BLACK, 12, 0);
+    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 13, 0);
     
     // Print system information to serial
     serial_write_string("\n=== SYSTEM INFORMATION ===\n");
@@ -965,7 +998,7 @@ void kernel_main() {
     timer_print_stats();
 
     // Initialize shell
-    cursor_row = 14;
+    cursor_row = 15;
     cursor_col = 0;
     clear_command_buffer();
     print_shell_prompt();

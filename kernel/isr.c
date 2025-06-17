@@ -62,6 +62,10 @@ void isr_init() {
     idt_set_gate(45, (uint32_t)isr45, 0x08, 0x8E);
     idt_set_gate(46, (uint32_t)isr46, 0x08, 0x8E);
     idt_set_gate(47, (uint32_t)isr47, 0x08, 0x8E);
+    
+    // Set up system call interrupt (0x80 = 128)
+    // 0xEE allows user-mode access (DPL = 3)
+    idt_set_gate(128, (uint32_t)isr128, 0x08, 0xEE);
 }
 
 // Register a custom handler for an interrupt

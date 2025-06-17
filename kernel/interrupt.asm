@@ -81,6 +81,9 @@ ISR_NO_ERROR_CODE 45   ; IRQ13 - FPU / Coprocessor / Inter-processor
 ISR_NO_ERROR_CODE 46   ; IRQ14 - Primary ATA hard disk
 ISR_NO_ERROR_CODE 47   ; IRQ15 - Secondary ATA hard disk
 
+; System call interrupt (0x80 = 128)
+ISR_NO_ERROR_CODE 128  ; System call
+
 ; This is the common part for all interrupt handlers
 extern isr_handler      ; The C function to handle interrupts
 isr_common_stub:

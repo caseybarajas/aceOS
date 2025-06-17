@@ -80,20 +80,7 @@ typedef struct scheduler_stats {
 // Global current process variable
 extern process_t* current_process;
 
-// System call numbers
-#define SYS_EXIT        1
-#define SYS_FORK        2
-#define SYS_EXEC        3
-#define SYS_WAIT        4
-#define SYS_GETPID      5
-#define SYS_SLEEP       6
-#define SYS_PRINT       7
-#define SYS_READ        8
-#define SYS_WRITE       9
-#define SYS_OPEN        10
-#define SYS_CLOSE       11
-#define SYS_MALLOC      12
-#define SYS_FREE        13
+// System call numbers are now defined in syscall.h
 
 // Function prototypes
 // Process management
@@ -119,9 +106,7 @@ void context_switch(process_t* from, process_t* to);
 void save_context(process_t* process);
 void load_context(process_t* process);
 
-// System calls
-void syscall_init(void);
-uint32_t syscall_handler(uint32_t syscall_num, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+// System calls are now handled in syscall.h
 
 // User mode support
 void enter_user_mode(uint32_t entry_point, uint32_t stack_pointer);
