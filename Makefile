@@ -24,7 +24,7 @@ LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 # files
 BOOT_SRC = $(BOOT_DIR)/boot.asm
 KERNEL_ENTRY_SRC = $(KERNEL_DIR)/kernel_entry.asm
-KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/heap.c $(KERNEL_DIR)/memory_utils.c $(KERNEL_DIR)/process.c $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/syscall.c $(KERNEL_DIR)/syscall_wrappers.c
+KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/heap.c $(KERNEL_DIR)/memory_utils.c $(KERNEL_DIR)/process.c $(KERNEL_DIR)/scheduler.c $(KERNEL_DIR)/syscall.c $(KERNEL_DIR)/syscall_wrappers.c $(KERNEL_DIR)/gui.c
 DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c $(DRIVERS_DIR)/fs.c $(DRIVERS_DIR)/timer.c $(DRIVERS_DIR)/disk.c $(DRIVERS_DIR)/graphics.c
 INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
 PAGING_ASM_SRC = $(KERNEL_DIR)/paging.asm

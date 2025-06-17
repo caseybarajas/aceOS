@@ -15,6 +15,7 @@
 #include "utils.h"
 #include "syscall.h"
 #include "graphics.h"
+#include "gui.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -285,6 +286,10 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("gfxtest  - Run graphics test with animations", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("gui      - Start GUI desktop environment", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -947,6 +952,23 @@ void execute_command(const char* command) {
         cursor_row = 5;
         cursor_col = 0;
         k_print_string("Graphics test completed!", WHITE_ON_BLACK, cursor_row, cursor_col);
+        print_shell_prompt();
+    }
+    else if (strcmp(command, "gui") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Starting GUI desktop environment...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // For now, directly call the GUI function instead of using incomplete multitasking
+        // TODO: Fix context switching in scheduler for proper multitasking
+        serial_write_string("Calling GUI process directly...\n");
+        gui_process_main();
+        
+        // After GUI exits, we return here
+        clear_screen();
+        cursor_row = 5;
+        cursor_col = 0;
+        k_print_string("Returned from GUI to shell", WHITE_ON_BLACK, cursor_row, cursor_col);
         print_shell_prompt();
     }
     else if (command_length > 0) {
