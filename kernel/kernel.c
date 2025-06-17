@@ -48,13 +48,7 @@ void execute_command(const char* command);
 void clear_command_buffer();
 void shell_handle_input(char c);
 
-// Entry point - this will be called by the bootloader
-void _start() {
-    kernel_main();
-    
-    // In case kernel_main ever returns (it shouldn't)
-    while(1) {}
-}
+// Entry point is now in kernel_entry.asm
 
 // Fill the screen with a pattern to make it obvious if the kernel is running
 void fill_screen_pattern() {
@@ -373,10 +367,36 @@ void execute_command(const char* command) {
         cursor_col = 0;
         
         // Get the file path
-        const char* path = command + 6;
+        const char* input_path = command + 6;
+        
+        // Construct full path if relative
+        char full_path[FS_MAX_PATH_LEN];
+        if (input_path[0] == '/') {
+            // Absolute path
+            strncpy(full_path, input_path, FS_MAX_PATH_LEN);
+            full_path[FS_MAX_PATH_LEN - 1] = '\0';
+        } else {
+            // Relative path - construct full path
+            char* current_dir = fs_get_current_dir();
+            if (strcmp(current_dir, "/") == 0) {
+                // In root directory
+                full_path[0] = '/';
+                strncpy(full_path + 1, input_path, FS_MAX_PATH_LEN - 1);
+                full_path[FS_MAX_PATH_LEN - 1] = '\0';
+            } else {
+                // In subdirectory
+                strncpy(full_path, current_dir, FS_MAX_PATH_LEN);
+                int len = strlen(full_path);
+                if (len < FS_MAX_PATH_LEN - 1) {
+                    full_path[len] = '/';
+                    strncpy(full_path + len + 1, input_path, FS_MAX_PATH_LEN - len - 1);
+                }
+                full_path[FS_MAX_PATH_LEN - 1] = '\0';
+            }
+        }
         
         // Create an empty file
-        int result = fs_create(path, 0);
+        int result = fs_create(full_path, 0);
         
         if (result == 0) {
             k_print_string("File created successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
@@ -495,10 +515,6 @@ void execute_command(const char* command) {
         cursor_col = 0;
         
         const char* path = command + 3;
-        
-        // Debug output
-        debug_print("cd attempting to change to: ");
-        debug_println(path);
         
         int result = fs_change_dir(path);
         
@@ -797,6 +813,11 @@ void shell_handle_input(char c) {
 
 // Main kernel function
 void kernel_main() {
+    // Write immediate debug pattern to show we reached here
+    volatile unsigned char *video = (volatile unsigned char*)0xB8000;
+    video[10] = 'K'; video[11] = 0x0F;  // White 'K' 
+    video[12] = 'M'; video[13] = 0x0F;  // White 'M'
+    
     // Clear screen
     clear_screen();
     

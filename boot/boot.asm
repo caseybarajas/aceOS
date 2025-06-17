@@ -40,7 +40,7 @@ load_kernel:
     
     ; load the kernel (from sector 2, right after bootloader)
     mov ah, 0x02    ; BIOS read sector function
-    mov al, 60      ; number of sectors to read (30KB, should be enough for kernel)
+    mov al, 120     ; number of sectors to read (60KB, should be enough for enhanced kernel)
     xor ch, ch      ; cylinder 0
     mov cl, 2       ; sector 2 (sectors are 1-based, sector 1 is bootloader)
     xor dh, dh      ; head 0

@@ -555,19 +555,71 @@ int fs_list_dir(const char* path, char* buffer, uint32_t buffer_size) {
         // Get type string
         const char* type_str = (fs.files[file_idx].type == FS_TYPE_DIRECTORY) ? "DIR" : "FILE";
         
+        // Manual string construction instead of snprintf
         // Format: "name (TYPE) size: xxx bytes\n"
-        int written = snprintf(buffer + offset, buffer_size - offset, 
-                              "%s (%s) size: %d bytes\n", 
-                              fs.files[file_idx].name, 
-                              type_str, 
-                              fs.files[file_idx].size);
         
-        if (written < 0 || (uint32_t)written >= buffer_size - offset) {
-            // Buffer is full
-            break;
+        // Add filename
+        int name_len = strlen(fs.files[file_idx].name);
+        if (offset + name_len >= buffer_size - 1) break;
+        strncpy(buffer + offset, fs.files[file_idx].name, name_len);
+        offset += name_len;
+        
+        // Add " ("
+        if (offset + 2 >= buffer_size - 1) break;
+        buffer[offset++] = ' ';
+        buffer[offset++] = '(';
+        
+        // Add type string
+        int type_len = strlen(type_str);
+        if (offset + type_len >= buffer_size - 1) break;
+        strncpy(buffer + offset, type_str, type_len);
+        offset += type_len;
+        
+        // Add ") size: "
+        const char* size_prefix = ") size: ";
+        int prefix_len = strlen(size_prefix);
+        if (offset + prefix_len >= buffer_size - 1) break;
+        strncpy(buffer + offset, size_prefix, prefix_len);
+        offset += prefix_len;
+        
+        // Convert size to string manually
+        char size_str[16];
+        int size_len = 0;
+        uint32_t size = fs.files[file_idx].size;
+        if (size == 0) {
+            size_str[0] = '0';
+            size_len = 1;
+        } else {
+            // Convert number to string
+            char temp[16];
+            int temp_len = 0;
+            while (size > 0) {
+                temp[temp_len++] = '0' + (size % 10);
+                size /= 10;
+            }
+            // Reverse the digits
+            for (int j = 0; j < temp_len; j++) {
+                size_str[j] = temp[temp_len - 1 - j];
+            }
+            size_len = temp_len;
         }
         
-        offset += written;
+        // Add size string
+        if (offset + size_len >= buffer_size - 1) break;
+        strncpy(buffer + offset, size_str, size_len);
+        offset += size_len;
+        
+        // Add " bytes\n"
+        const char* suffix = " bytes\n";
+        int suffix_len = strlen(suffix);
+        if (offset + suffix_len >= buffer_size - 1) break;
+        strncpy(buffer + offset, suffix, suffix_len);
+        offset += suffix_len;
+    }
+    
+    // Null terminate the buffer
+    if (offset < buffer_size) {
+        buffer[offset] = '\0';
     }
     
     return offset;
@@ -661,12 +713,23 @@ int fs_change_dir(const char* path) {
     char target_path[FS_MAX_PATH_LEN];
     if (path[0] == '/') {
         strncpy(target_path, path, FS_MAX_PATH_LEN);
+        target_path[FS_MAX_PATH_LEN - 1] = '\0';
     } else {
         // Handle relative paths
         if (strcmp(current_directory, "/") == 0) {
-            snprintf(target_path, FS_MAX_PATH_LEN, "/%s", path);
+            // Manually construct path for root directory
+            target_path[0] = '/';
+            strncpy(target_path + 1, path, FS_MAX_PATH_LEN - 1);
+            target_path[FS_MAX_PATH_LEN - 1] = '\0';
         } else {
-            snprintf(target_path, FS_MAX_PATH_LEN, "%s/%s", current_directory, path);
+            // Manually construct path for non-root directory
+            strncpy(target_path, current_directory, FS_MAX_PATH_LEN);
+            int len = strlen(target_path);
+            if (len < FS_MAX_PATH_LEN - 1) {
+                target_path[len] = '/';
+                strncpy(target_path + len + 1, path, FS_MAX_PATH_LEN - len - 1);
+            }
+            target_path[FS_MAX_PATH_LEN - 1] = '\0';
         }
     }
     
@@ -700,6 +763,7 @@ int fs_change_dir(const char* path) {
     }
     
     int file_idx = fs_find(target_path);
+    
     if (file_idx < 0) {
         debug_println("Directory not found");
         return -1;
@@ -712,6 +776,7 @@ int fs_change_dir(const char* path) {
     
     // Update current directory
     strncpy(current_directory, target_path, FS_MAX_PATH_LEN);
+    
     return 0;
 }
 

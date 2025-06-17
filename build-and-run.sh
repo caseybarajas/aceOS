@@ -26,16 +26,24 @@ docker-compose run --rm aceos-dev make clean
 echo "Building aceOS..."
 docker-compose run --rm aceos-dev make
 
-# Run the OS in QEMU with graphical display
-echo "Running aceOS in QEMU..."
-
-# If on macOS, handle display differently
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  docker run --rm -v "$(pwd)":/aceos aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
-else
-  # For Linux
-  xhost +local:docker
-  docker run --rm -v "$(pwd)":/aceos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
+# Check if build was successful
+if [ ! -f "os_image.img" ]; then
+    echo "Build failed! os_image.img not found."
+    exit 1
 fi
 
-echo "Done!" 
+echo "Build successful! Running aceOS in QEMU..."
+
+# Run the OS in QEMU with graphical display
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # For macOS
+  echo "Running on macOS..."
+  docker-compose run --rm aceos-dev qemu-system-i386 -fda /aceos/os_image.img -serial stdio
+else
+  # For Linux
+  echo "Running on Linux..."
+  xhost +local:docker 2>/dev/null || echo "Warning: Could not configure X11 forwarding"
+  docker-compose run --rm -e DISPLAY=$DISPLAY aceos-dev qemu-system-i386 -fda /aceos/os_image.img -serial stdio
+fi
+
+echo "aceOS execution completed!" 
