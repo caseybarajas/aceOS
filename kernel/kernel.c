@@ -1,13 +1,18 @@
 // kernel.c
-// a very minimal c kernel for aceos.
+// Enhanced aceOS kernel with advanced memory management, multitasking, and I/O
 
 #include "libc/stdint.h"
 #include "idt.h"
 #include "isr.h"
 #include "keyboard.h"
-#include "serial.h"  // Include the serial driver
+#include "serial.h"
 #include "libc/libc.h"
-#include "fs.h"      // Include our new filesystem
+#include "fs.h"
+#include "memory.h"
+#include "process.h"
+#include "timer.h"
+#include "disk.h"
+#include "utils.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -240,6 +245,26 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("fsinfo   - Display filesystem information", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("meminfo  - Display memory information", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("diskinfo - Display disk information", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("timer    - Display timer statistics", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("ps       - Show process information", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        cursor_row++;
+        cursor_col = 2;
+        k_print_string("test     - Run system tests", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -249,7 +274,11 @@ void execute_command(const char* command) {
     else if (strcmp(command, "version") == 0) {
         cursor_row++;
         cursor_col = 0;
-        k_print_string("aceOS v0.1", WHITE_ON_BLACK, cursor_row, cursor_col);
+        k_print_string("aceOS Enhanced v2.0", WHITE_ON_BLACK, cursor_row, cursor_col);
+        cursor_row++;
+        k_print_string("Features: Virtual Memory, Multitasking, Disk I/O", WHITE_ON_BLACK, cursor_row, cursor_col);
+        cursor_row++;
+        k_print_string("Advanced Heap Manager, Timer System", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strncmp(command, "echo ", 5) == 0) {
         cursor_row++;
@@ -638,6 +667,74 @@ void execute_command(const char* command) {
             k_print_string("Error: Could not get file information", WHITE_ON_BLACK, cursor_row, cursor_col);
         }
     }
+    else if (strcmp(command, "meminfo") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Memory information printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Print memory information to serial
+        heap_print_stats();
+        serial_write_string("Free physical frames: ");
+        char buffer[32];
+        itoa(pmm_get_free_frames(), buffer, 10);
+        serial_write_string(buffer);
+        serial_write_string("\n");
+    }
+    else if (strcmp(command, "diskinfo") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Disk information printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Print disk information to serial
+        disk_print_all_drives();
+    }
+    else if (strcmp(command, "timer") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Timer statistics printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Print timer statistics to serial
+        timer_print_stats();
+    }
+    else if (strcmp(command, "ps") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Process information printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Print scheduler statistics to serial
+        scheduler_print_stats();
+    }
+    else if (strcmp(command, "test") == 0) {
+        cursor_row++;
+        cursor_col = 0;
+        k_print_string("Running system tests...", WHITE_ON_BLACK, cursor_row, cursor_col);
+        
+        // Run basic system tests
+        serial_write_string("\n=== RUNNING SYSTEM TESTS ===\n");
+        
+        // Test memory allocation
+        serial_write_string("Testing memory allocation...\n");
+        void* test_ptr = heap_malloc(1024);
+        if (test_ptr) {
+            serial_write_string("Memory allocation: PASS\n");
+            heap_free(test_ptr);
+            serial_write_string("Memory deallocation: PASS\n");
+        } else {
+            serial_write_string("Memory allocation: FAIL\n");
+        }
+        
+        // Test heap validation
+        if (heap_validate()) {
+            serial_write_string("Heap validation: PASS\n");
+        } else {
+            serial_write_string("Heap validation: FAIL\n");
+        }
+        
+        serial_write_string("=== SYSTEM TESTS COMPLETE ===\n");
+        
+        cursor_row++;
+        k_print_string("System tests completed - check serial output", WHITE_ON_BLACK, cursor_row, cursor_col);
+    }
     else if (command_length > 0) {
         cursor_row++;
         cursor_col = 0;
@@ -703,24 +800,48 @@ void kernel_main() {
     // Clear screen
     clear_screen();
     
-    // Initialize serial port
+    // Initialize serial port first for debugging
     serial_init();
-    serial_write_string("Serial port initialized");
+    serial_write_string("\n\n=== aceOS Enhanced v2.0 Starting Up ===\n");
+    serial_write_string("Serial debug output initialized\n");
 
-    k_print_string("*** Kernel Loaded Successfully! ***", WHITE_ON_BLACK, 0, 0);
-    serial_write_string("Kernel loaded successfully!");
+    k_print_string("*** aceOS Enhanced v2.0 Loaded! ***", WHITE_ON_BLACK, 0, 0);
+    k_print_string("Advanced Memory, Multitasking, Disk I/O", WHITE_ON_BLACK, 1, 0);
+    serial_write_string("Enhanced kernel loaded successfully!\n");
     
     // Initialize interrupt system
-    serial_write_string("Initializing interrupt system...");
+    k_print_string("Initializing interrupt system...", WHITE_ON_BLACK, 2, 0);
+    serial_write_string("Initializing interrupt system...\n");
     idt_init();     // Set up and load the IDT
-    serial_write_string("Initializing service routines...");
     isr_init();     // Set up interrupt service routines
     
+    // Initialize physical memory manager
+    k_print_string("Initializing memory management...", WHITE_ON_BLACK, 3, 0);
+    serial_write_string("Initializing memory subsystems...\n");
+    pmm_init();
+    vmm_init();
+    heap_init((void*)0x800000, 0x400000); // 4MB heap at 8MB
+    
+    // Initialize timer for scheduling
+    k_print_string("Initializing system timer...", WHITE_ON_BLACK, 4, 0);
+    timer_init();
+    
+    // Initialize disk subsystem
+    k_print_string("Initializing disk subsystem...", WHITE_ON_BLACK, 5, 0);
+    disk_init();
+    
+    // Initialize process management
+    k_print_string("Initializing process management...", WHITE_ON_BLACK, 6, 0);
+    process_init();
+    scheduler_init();
+    
     // Initialize keyboard
+    k_print_string("Initializing keyboard...", WHITE_ON_BLACK, 7, 0);
     keyboard_init();
-    serial_write_string("Keyboard initialized");
+    serial_write_string("Keyboard initialized\n");
 
     // Enable interrupts (using inline assembly)
+    k_print_string("Enabling interrupts...", WHITE_ON_BLACK, 8, 0);
 #ifdef __GNUC__
     __asm__ __volatile__("sti");
 #else
@@ -731,21 +852,35 @@ void kernel_main() {
     // Just a placeholder, not actually enabling interrupts
     #endif
 #endif
-    serial_write_string("Interrupts enabled");
+    serial_write_string("Interrupts enabled\n");
 
     // Initialize C standard library
     libc_init();
     
     // Initialize filesystem
+    k_print_string("Initializing filesystem...", WHITE_ON_BLACK, 9, 0);
     fs_init();
-    serial_write_string("Filesystem initialized");
+    serial_write_string("Filesystem initialized\n");
 
-    // Keyboard input demo message
-    k_print_string("aceOS Shell v0.1", WHITE_ON_BLACK, 0, 0);
-    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 1, 0);
+    // System ready message
+    k_print_string("Enhanced system initialization complete!", WHITE_ON_BLACK, 10, 0);
+    k_print_string("aceOS Enhanced Shell v2.0", WHITE_ON_BLACK, 11, 0);
+    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 12, 0);
+    
+    // Print system information to serial
+    serial_write_string("\n=== SYSTEM INFORMATION ===\n");
+    serial_write_string("Physical Memory: ");
+    char buffer[32];
+    itoa(pmm_get_free_frames() * 4, buffer, 10);
+    serial_write_string(buffer);
+    serial_write_string("KB free\n");
+    
+    disk_print_all_drives();
+    heap_print_stats();
+    timer_print_stats();
 
     // Initialize shell
-    cursor_row = 3;
+    cursor_row = 14;
     cursor_col = 0;
     clear_command_buffer();
     print_shell_prompt();
@@ -757,5 +892,8 @@ void kernel_main() {
             char c = keyboard_getchar();
             shell_handle_input(c);
         }
+        
+        // Halt until next interrupt to save CPU
+        asm("hlt");
     }
 }

@@ -23,17 +23,19 @@ LDFLAGS_KERNEL = -Ttext 0x10000 --oformat binary -m elf_i386 -o kernel.bin
 
 # files
 BOOT_SRC = $(BOOT_DIR)/boot.asm
-KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c
-DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c $(DRIVERS_DIR)/fs.c
+KERNEL_SRCS = $(KERNEL_DIR)/kernel.c $(KERNEL_DIR)/idt.c $(KERNEL_DIR)/isr.c $(KERNEL_DIR)/pic.c $(KERNEL_DIR)/pmm.c $(KERNEL_DIR)/vmm.c $(KERNEL_DIR)/heap.c $(KERNEL_DIR)/memory_utils.c $(KERNEL_DIR)/process.c $(KERNEL_DIR)/scheduler.c
+DRIVER_SRCS = $(DRIVERS_DIR)/keyboard.c $(DRIVERS_DIR)/serial.c $(DRIVERS_DIR)/fs.c $(DRIVERS_DIR)/timer.c $(DRIVERS_DIR)/disk.c
 INT_ASM_SRC = $(KERNEL_DIR)/interrupt.asm
+PAGING_ASM_SRC = $(KERNEL_DIR)/paging.asm
 LIBC_SRCS = $(LIBC_DIR)/string.c $(LIBC_DIR)/stdio.c $(LIBC_DIR)/stdlib.c $(LIBC_DIR)/libc.c
 
 # objects
 KERNEL_OBJS = $(KERNEL_SRCS:.c=.o)
 DRIVER_OBJS = $(DRIVER_SRCS:.c=.o)
 INT_OBJ = $(KERNEL_DIR)/interrupt.o
+PAGING_OBJ = $(KERNEL_DIR)/paging.o
 LIBC_OBJS = $(LIBC_SRCS:.c=.o)
-ALL_OBJS = $(KERNEL_OBJS) $(DRIVER_OBJS) $(INT_OBJ) $(LIBC_OBJS)
+ALL_OBJS = $(KERNEL_OBJS) $(DRIVER_OBJS) $(INT_OBJ) $(PAGING_OBJ) $(LIBC_OBJS)
 
 # output files
 KERNEL_BIN = kernel.bin
@@ -49,6 +51,10 @@ boot.bin: $(BOOT_SRC)
 # build the interrupt assembly file
 $(INT_OBJ): $(INT_ASM_SRC)
 	$(NASM) $(NASMFLAGS_INT) $(INT_ASM_SRC)
+
+# build the paging assembly file
+$(PAGING_OBJ): $(PAGING_ASM_SRC)
+	$(NASM) -f elf32 -o $(PAGING_OBJ) $(PAGING_ASM_SRC)
 
 # build the c kernel and driver object files
 %.o: %.c

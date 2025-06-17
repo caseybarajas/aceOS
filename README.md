@@ -1,15 +1,39 @@
-# CaseyOS
+# aceOS Enhanced v2.0
 
-A bootable operating system featuring a 16-bit bootloader that launches a 32-bit kernel, designed for educational purposes.
+An advanced bootable operating system featuring a 16-bit bootloader that launches a 32-bit kernel with virtual memory management, preemptive multitasking, and disk I/O capabilities.
 
 ## Features
 
 ### Core System
 - **16-bit Bootloader**: Loads the kernel from disk into memory
-- **32-bit Protected Mode Kernel**: Full kernel with interrupt handling
-- **Interrupt System**: IDT setup with keyboard and serial interrupts
+- **32-bit Protected Mode Kernel**: Advanced kernel with comprehensive system management
+- **Virtual Memory Management**: Complete paging system with page directories and tables
+- **Physical Memory Manager**: Bitmap-based frame allocation with 30MB+ support
+- **Enhanced Heap Manager**: Best-fit allocator with corruption detection and validation
+- **Interrupt System**: IDT setup with keyboard, serial, and timer interrupts
 - **Serial Debug Output**: COM1 port debugging support
 - **VGA Text Mode**: 80x25 character display
+
+### Advanced Memory Management
+- **Paging System**: Full x86 paging with virtual-to-physical address translation
+- **Memory Protection**: Kernel/user space separation (framework ready)
+- **Dynamic Allocation**: Advanced heap with block splitting and merging
+- **Memory Validation**: Real-time heap corruption detection
+- **Alignment Support**: Proper memory alignment for optimal performance
+
+### Multitasking & Scheduling
+- **Process Management**: Complete PCB (Process Control Block) implementation
+- **Round-Robin Scheduler**: Preemptive multitasking with time slicing
+- **Context Switching**: Full CPU context save/restore
+- **Process States**: Running, ready, blocked, terminated state management
+- **Priority Scheduling**: High, normal, and low priority process support
+
+### Enhanced I/O Systems
+- **Timer Driver**: Programmable Interval Timer with 1000Hz precision
+- **System Clock**: Real-time system uptime tracking
+- **Disk I/O**: ATA/IDE hard disk support with LBA addressing
+- **Drive Detection**: Automatic detection and identification of storage devices
+- **Disk Testing**: Built-in read/write verification system
 
 ### Comprehensive Filesystem
 - **In-Memory Filesystem**: Complete hierarchical file system
@@ -46,6 +70,13 @@ A bootable operating system featuring a 16-bit bootloader that launches a 32-bit
 - `tree [path]` - Display directory tree structure
 - `stat <path>` - Show detailed file information
 - `fsinfo` - Display filesystem statistics
+
+#### System Management Commands
+- `meminfo` - Display memory usage and heap statistics
+- `diskinfo` - Show all detected disk drives and their information
+- `timer` - Display system timer and uptime statistics
+- `ps` - Show process information and scheduler statistics
+- `test` - Run comprehensive system tests
 
 ## Building and Running
 
@@ -85,7 +116,7 @@ qemu-system-i386 -fda os_image.img
 ## Architecture
 
 ```
-CaseyOS/
+aceOS/
 ├── boot/           # 16-bit bootloader assembly
 ├── kernel/         # 32-bit kernel C code
 ├── drivers/        # Device drivers (keyboard, serial, filesystem)
@@ -100,7 +131,7 @@ aceOS> help
 aceOS> mkdir /home
 aceOS> cd /home
 aceOS> touch test.txt
-aceOS> write test.txt Hello from CaseyOS!
+aceOS> write test.txt Hello from aceOS!
 aceOS> cat test.txt
 aceOS> cp test.txt backup.txt
 aceOS> ls

@@ -31,11 +31,11 @@ echo "Running aceOS in QEMU..."
 
 # If on macOS, handle display differently
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  docker run --rm -v "$(pwd)":/aceos caseyos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
+  docker run --rm -v "$(pwd)":/aceos aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
 else
   # For Linux
   xhost +local:docker
-  docker run --rm -v "$(pwd)":/aceos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix caseyos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
+  docker run --rm -v "$(pwd)":/aceos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
 fi
 
 echo "Done!" 

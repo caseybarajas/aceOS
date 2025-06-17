@@ -49,10 +49,10 @@ set VCXSRV_RUNNING=%ERRORLEVEL%
 if %VCXSRV_RUNNING% equ 0 (
     echo VcXsrv detected, using graphical display...
     set DISPLAY=127.0.0.1:0.0
-    docker run --rm -e DISPLAY=%DISPLAY% -v %cd%:/aceos caseyos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
+    docker run --rm -e DISPLAY=%DISPLAY% -v %cd%:/aceos aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
 ) else (
     echo VcXsrv not detected, using standard display...
-    docker run --rm -v %cd%:/aceos caseyos-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
+    docker run --rm -v %cd%:/aceos aceOS-aceos-dev qemu-system-i386 -fda /aceos/os_image.img
 )
 
 :end

@@ -2,6 +2,7 @@
 #include "io.h"
 #include "serial.h"
 #include "isr.h"
+#include "pic.h"
 
 // Serial port I/O ports
 #define SERIAL_COM1_PORT 0x3F8  // COM1 port base address

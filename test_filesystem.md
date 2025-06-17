@@ -1,7 +1,7 @@
-# CaseyOS Enhanced Filesystem Test Guide
+# aceOS Enhanced Filesystem Test Guide
 
 ## Overview
-Your OS now has a comprehensive in-memory filesystem with the following features:
+aceOS now has a comprehensive in-memory filesystem with the following features:
 
 ## New Commands Added:
 
@@ -47,7 +47,7 @@ cd /
 ### 2. File Creation and Manipulation
 ```
 touch /home/test.txt
-write /home/test.txt Hello World from CaseyOS!
+write /home/test.txt Hello World from aceOS!
 cat /home/test.txt
 cp /home/test.txt /home/backup.txt
 ls /home

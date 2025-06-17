@@ -2,8 +2,8 @@
 
 // Initialize the C standard library
 void libc_init(void) {
-    // Initialize heap for memory allocation
-    initialize_heap();
+    // Heap initialization is done in kernel main
+    // initialize_heap();
     
     // Any other initializations can be done here
     
