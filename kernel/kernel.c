@@ -123,8 +123,16 @@ void update_cursor() {
 // Print the shell prompt
 void print_shell_prompt() {
     cursor_row++;
-    k_print_string(SHELL_PROMPT, WHITE_ON_BLACK, cursor_row, 0);
-    cursor_col = sizeof(SHELL_PROMPT) - 1;  // Move cursor after prompt
+    
+    // Show current directory in prompt
+    char* current_dir = fs_get_current_dir();
+    k_print_string("aceOS ", WHITE_ON_BLACK, cursor_row, 0);
+    cursor_col = 6;
+    k_print_string(current_dir, WHITE_ON_BLACK, cursor_row, cursor_col);
+    cursor_col += strlen(current_dir);
+    k_print_string("> ", WHITE_ON_BLACK, cursor_row, cursor_col);
+    cursor_col += 2;
+    
     update_cursor();
 }
 
@@ -409,11 +417,37 @@ void execute_command(const char* command) {
         cursor_col = 0;
         
         // Get the file path
-        const char* path = command + 4;
+        const char* input_path = command + 4;
+        
+        // Construct full path if relative
+        char full_path[FS_MAX_PATH_LEN];
+        if (input_path[0] == '/') {
+            // Absolute path
+            strncpy(full_path, input_path, FS_MAX_PATH_LEN);
+            full_path[FS_MAX_PATH_LEN - 1] = '\0';
+        } else {
+            // Relative path - construct full path
+            char* current_dir = fs_get_current_dir();
+            if (strcmp(current_dir, "/") == 0) {
+                // In root directory
+                full_path[0] = '/';
+                strncpy(full_path + 1, input_path, FS_MAX_PATH_LEN - 1);
+                full_path[FS_MAX_PATH_LEN - 1] = '\0';
+            } else {
+                // In subdirectory
+                strncpy(full_path, current_dir, FS_MAX_PATH_LEN);
+                int len = strlen(full_path);
+                if (len < FS_MAX_PATH_LEN - 1) {
+                    full_path[len] = '/';
+                    strncpy(full_path + len + 1, input_path, FS_MAX_PATH_LEN - len - 1);
+                }
+                full_path[FS_MAX_PATH_LEN - 1] = '\0';
+            }
+        }
         
         // Buffer to hold file content
         char buffer[1024];
-        int bytes_read = fs_read(path, buffer, sizeof(buffer) - 1);
+        int bytes_read = fs_read(full_path, buffer, sizeof(buffer) - 1);
         
         if (bytes_read >= 0) {
             // Null terminate the buffer
@@ -480,8 +514,34 @@ void execute_command(const char* command) {
         content_start = cmd_ptr;
         
         if (filepath_len > 0 && *content_start != '\0') {
+            // Construct full path if relative
+            char full_path[FS_MAX_PATH_LEN];
+            if (filepath[0] == '/') {
+                // Absolute path
+                strncpy(full_path, filepath, FS_MAX_PATH_LEN);
+                full_path[FS_MAX_PATH_LEN - 1] = '\0';
+            } else {
+                // Relative path - construct full path
+                char* current_dir = fs_get_current_dir();
+                if (strcmp(current_dir, "/") == 0) {
+                    // In root directory
+                    full_path[0] = '/';
+                    strncpy(full_path + 1, filepath, FS_MAX_PATH_LEN - 1);
+                    full_path[FS_MAX_PATH_LEN - 1] = '\0';
+                } else {
+                    // In subdirectory
+                    strncpy(full_path, current_dir, FS_MAX_PATH_LEN);
+                    int len = strlen(full_path);
+                    if (len < FS_MAX_PATH_LEN - 1) {
+                        full_path[len] = '/';
+                        strncpy(full_path + len + 1, filepath, FS_MAX_PATH_LEN - len - 1);
+                    }
+                    full_path[FS_MAX_PATH_LEN - 1] = '\0';
+                }
+            }
+            
             // Write content to the file
-            int result = fs_write(filepath, content_start, strlen(content_start));
+            int result = fs_write(full_path, content_start, strlen(content_start));
             
             if (result == 0) {
                 k_print_string("File written successfully", WHITE_ON_BLACK, cursor_row, cursor_col);
@@ -782,8 +842,12 @@ void terminal_putchar(char c) {
         return;
     } 
     else if (c == '\b') {
-        // Backspace - remove character from buffer
-        if (cursor_col > sizeof(SHELL_PROMPT) - 1) {
+        // Backspace - remove character from buffer  
+        // Calculate prompt length: "aceOS " + current_dir + "> "
+        char* current_dir = fs_get_current_dir();
+        int prompt_length = 6 + strlen(current_dir) + 2; // "aceOS " + dir + "> "
+        
+        if (cursor_col > prompt_length - 1) {
             cursor_col--;
             k_print_char(' ', WHITE_ON_BLACK, cursor_row, cursor_col);
             command_length--;
