@@ -95,8 +95,6 @@ void serial_write_string(const char* str) {
         serial_write(*str);
         str++;
     }
-    serial_write('\r');
-    serial_write('\n');
 }
 
 // Write a hexadecimal value to the serial port
