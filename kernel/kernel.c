@@ -874,7 +874,7 @@ void terminal_putchar(char c) {
         // Backspace - remove character from buffer  
         // Calculate prompt length: "aceOS " + current_dir + "> "
         char* current_dir = fs_get_current_dir();
-        int prompt_length = 6 + strlen(current_dir) + 2; // "aceOS " + dir + "> "
+        int prompt_length = 6 + strlen(current_dir) + 3; // "aceOS " + dir + "> "
         
         if (cursor_col > prompt_length - 1) {
             cursor_col--;
