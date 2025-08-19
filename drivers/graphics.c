@@ -269,12 +269,9 @@ void graphics_set_mode_13h(void) {
 // Switch back to text mode
 void graphics_set_text_mode(void) {
     serial_write_string("Switching back to text mode...\n");
-    
-    // Simple way to switch back to text mode
-    // Note: Would use BIOS interrupt to switch to text mode
-    
+    // In protected mode we cannot use BIOS; mark mode and rely on shell redraw
     graphics_state.current_mode = 3;
-    serial_write_string("Text mode restored\n");
+    serial_write_string("Text mode restored (logical)\n");
 }
 
 // Put a pixel at specified coordinates

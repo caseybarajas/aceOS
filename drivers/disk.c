@@ -135,8 +135,15 @@ int ata_identify_drive(uint8_t drive, disk_info_t* info) {
         return 0; // No drive
     }
     
-    // Wait for BSY to clear
-    ata_wait_busy(base);
+    // Wait for BSY to clear with timeout
+    {
+        uint32_t timeout = 1000000; // arbitrary loop count timeout
+        while ((inb(base + ATA_REG_STATUS) & ATA_STATUS_BSY) && --timeout) {}
+        if (timeout == 0) {
+            serial_write_string("ATA IDENTIFY timeout waiting for BSY clear\n");
+            return 0;
+        }
+    }
     
     // Check for errors
     status = inb(base + ATA_REG_STATUS);
@@ -144,9 +151,14 @@ int ata_identify_drive(uint8_t drive, disk_info_t* info) {
         return 0; // Error occurred
     }
     
-    // Wait for DRQ
-    while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ)) {
-        // Timeout check could be added here
+    // Wait for DRQ with timeout
+    {
+        uint32_t timeout = 1000000;
+        while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ) && --timeout) {}
+        if (timeout == 0) {
+            serial_write_string("ATA IDENTIFY timeout waiting for DRQ\n");
+            return 0;
+        }
     }
     
     // Read identification data
@@ -194,8 +206,15 @@ int ata_read_sectors(uint8_t drive, uint32_t lba, uint16_t count, void* buffer) 
     uint16_t base = (drive < 2) ? ATA_PRIMARY_BASE : ATA_SECONDARY_BASE;
     uint8_t drive_select = ((drive % 2) ? 0xF0 : 0xE0) | ((lba >> 24) & 0x0F);
     
-    // Wait for drive to be ready
-    ata_wait_ready(base);
+    // Wait for drive to be ready with timeout
+    {
+        uint32_t timeout = 1000000;
+        while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_RDY) && --timeout) {}
+        if (timeout == 0) {
+            serial_write_string("ATA READ timeout waiting for RDY\n");
+            return -1;
+        }
+    }
     
     // Set up LBA and sector count
     outb(base + ATA_REG_DRIVE_HEAD, drive_select);
@@ -210,9 +229,14 @@ int ata_read_sectors(uint8_t drive, uint32_t lba, uint16_t count, void* buffer) 
     uint16_t* buf = (uint16_t*)buffer;
     
     for (int sector = 0; sector < count; sector++) {
-        // Wait for data
-        while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ)) {
-            // Timeout check could be added here
+        // Wait for data with timeout
+        {
+            uint32_t timeout = 1000000;
+            while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ) && --timeout) {}
+            if (timeout == 0) {
+                serial_write_string("ATA READ timeout waiting for DRQ\n");
+                return -1;
+            }
         }
         
         // Read sector data
@@ -228,8 +252,15 @@ int ata_write_sectors(uint8_t drive, uint32_t lba, uint16_t count, void* buffer)
     uint16_t base = (drive < 2) ? ATA_PRIMARY_BASE : ATA_SECONDARY_BASE;
     uint8_t drive_select = ((drive % 2) ? 0xF0 : 0xE0) | ((lba >> 24) & 0x0F);
     
-    // Wait for drive to be ready
-    ata_wait_ready(base);
+    // Wait for drive to be ready with timeout
+    {
+        uint32_t timeout = 1000000;
+        while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_RDY) && --timeout) {}
+        if (timeout == 0) {
+            serial_write_string("ATA WRITE timeout waiting for RDY\n");
+            return -1;
+        }
+    }
     
     // Set up LBA and sector count
     outb(base + ATA_REG_DRIVE_HEAD, drive_select);
@@ -244,9 +275,14 @@ int ata_write_sectors(uint8_t drive, uint32_t lba, uint16_t count, void* buffer)
     uint16_t* buf = (uint16_t*)buffer;
     
     for (int sector = 0; sector < count; sector++) {
-        // Wait for data request
-        while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ)) {
-            // Timeout check could be added here
+        // Wait for data request with timeout
+        {
+            uint32_t timeout = 1000000;
+            while (!(inb(base + ATA_REG_STATUS) & ATA_STATUS_DRQ) && --timeout) {}
+            if (timeout == 0) {
+                serial_write_string("ATA WRITE timeout waiting for DRQ\n");
+                return -1;
+            }
         }
         
         // Write sector data
@@ -255,8 +291,15 @@ int ata_write_sectors(uint8_t drive, uint32_t lba, uint16_t count, void* buffer)
         }
     }
     
-    // Wait for write completion
-    ata_wait_ready(base);
+    // Wait for write completion with timeout
+    {
+        uint32_t timeout = 1000000;
+        while ((inb(base + ATA_REG_STATUS) & (ATA_STATUS_BSY)) && --timeout) {}
+        if (timeout == 0) {
+            serial_write_string("ATA WRITE timeout waiting for completion\n");
+            return -1;
+        }
+    }
     
     return 0; // Success
 }

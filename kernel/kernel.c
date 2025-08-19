@@ -3,6 +3,7 @@
 
 #include "libc/stdint.h"
 #include "idt.h"
+#include "io.h"
 #include "isr.h"
 #include "keyboard.h"
 #include "serial.h"
@@ -14,8 +15,6 @@
 #include "disk.h"
 #include "utils.h"
 #include "syscall.h"
-#include "graphics.h"
-#include "gui.h"
 
 // Define constants for video memory and display attributes
 #define REAL_MODE_VIDEO_MEM 0xB8000   // Standard VGA text mode address - this is correct for protected mode
@@ -25,14 +24,51 @@
 #define WHITE_ON_BLACK 0x07
 #define BRIGHT_WHITE_ON_BLACK 0x0F
 
+// Terminal state
+static int cursor_col = 0;
+static int cursor_row = 10;
+
+// Hardware cursor controls
+static void vga_enable_cursor(void) {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x00);   // start scanline 0 (cursor enabled)
+    outb(0x3D4, 0x0B);
+    outb(0x3D5, 0x0F);   // end scanline 15
+}
+
+static void vga_move_cursor(int row, int col) {
+    int pos = row * COLUMNS + col;
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
+// Scroll screen up by one row when needed
+static void scroll_screen(void) {
+    volatile unsigned char* video = (volatile unsigned char*)0xB8000;
+    int row_bytes = COLUMNS * 2;
+    // Move rows 1..ROWS-1 to 0..ROWS-2
+    for (int r = 0; r < ROWS - 1; r++) {
+        for (int c = 0; c < row_bytes; c++) {
+            video[r * row_bytes + c] = video[(r + 1) * row_bytes + c];
+        }
+    }
+    // Clear last row
+    int base = (ROWS - 1) * row_bytes;
+    for (int c = 0; c < COLUMNS; c++) {
+        video[base + c * 2] = ' ';
+        video[base + c * 2 + 1] = WHITE_ON_BLACK;
+    }
+    cursor_row = ROWS - 1;
+}
+
 // Shell constants
 #define MAX_COMMAND_LENGTH 72
 #define COMMAND_HISTORY_SIZE 10
 #define SHELL_PROMPT "aceOS> "
 
-// Terminal state
-static int cursor_col = 0;
-static int cursor_row = 10;
+// Terminal state (moved above for early use)
 
 // Shell state
 static char current_command[MAX_COMMAND_LENGTH];
@@ -99,19 +135,30 @@ void k_print_string(const char *str, unsigned char attribute, int row, int start
     if (!str) return;
     
     while (*str) {
-        if (row >= 0 && row < ROWS && col >= 0 && col < COLUMNS) {
-            k_print_char(*str, attribute, row, col);
-        }
-        
-        str++;
-        col++;
-        
-        if (col >= COLUMNS) {
+        char ch = *str++;
+        if (ch == '\n') {
             row++;
             col = 0;
-            
             if (row >= ROWS) {
-                row = ROWS - 1;
+                scroll_screen();
+                row = cursor_row; // scroll_screen sets cursor_row to last row
+            }
+            continue;
+        }
+        if (row >= ROWS) {
+            scroll_screen();
+            row = cursor_row;
+        }
+        if (col >= 0 && col < COLUMNS && row >= 0 && row < ROWS) {
+            k_print_char(ch, attribute, row, col);
+        }
+        col++;
+        if (col >= COLUMNS) {
+            col = 0;
+            row++;
+            if (row >= ROWS) {
+                scroll_screen();
+                row = cursor_row;
             }
         }
     }
@@ -119,22 +166,32 @@ void k_print_string(const char *str, unsigned char attribute, int row, int start
 
 // Draw cursor at current position
 void update_cursor() {
-    // Draw cursor (simple implementation - just a visible underscore character)
-    k_print_char('_', BRIGHT_WHITE_ON_BLACK, cursor_row, cursor_col);
+    if (cursor_row >= ROWS) {
+        scroll_screen();
+    }
+    if (cursor_col >= COLUMNS) {
+        cursor_col = 0;
+        cursor_row++;
+        if (cursor_row >= ROWS) scroll_screen();
+    }
+    vga_move_cursor(cursor_row, cursor_col);
 }
 
 // Print the shell prompt
 void print_shell_prompt() {
     cursor_row++;
+    if (cursor_row >= ROWS) {
+        scroll_screen();
+    }
     
-    // Show current directory in prompt
+    // Show current directory in prompt (no extra leading/trailing spaces)
     char* current_dir = fs_get_current_dir();
-    k_print_string("aceOS ", WHITE_ON_BLACK, cursor_row, 0);
-    cursor_col = 6;
+    k_print_string("aceOS", WHITE_ON_BLACK, cursor_row, 0);
+    cursor_col = 5;
     k_print_string(current_dir, WHITE_ON_BLACK, cursor_row, cursor_col);
     cursor_col += strlen(current_dir);
-    k_print_string("> ", WHITE_ON_BLACK, cursor_row, cursor_col);
-    cursor_col += 2;
+    k_print_string(">", WHITE_ON_BLACK, cursor_row, cursor_col);
+    cursor_col += 1;
     
     update_cursor();
 }
@@ -278,18 +335,6 @@ void execute_command(const char* command) {
         cursor_row++;
         cursor_col = 2;
         k_print_string("syscall-stats - Show system call statistics", WHITE_ON_BLACK, cursor_row, cursor_col);
-        
-        cursor_row++;
-        cursor_col = 2;
-        k_print_string("graphics - Demo VGA graphics mode (320x200)", WHITE_ON_BLACK, cursor_row, cursor_col);
-        
-        cursor_row++;
-        cursor_col = 2;
-        k_print_string("gfxtest  - Run graphics test with animations", WHITE_ON_BLACK, cursor_row, cursor_col);
-        
-        cursor_row++;
-        cursor_col = 2;
-        k_print_string("gui      - Start GUI desktop environment", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
     else if (strcmp(command, "clear") == 0) {
         clear_screen();
@@ -854,6 +899,8 @@ void execute_command(const char* command) {
         
         k_print_string("System call statistics printed to serial port", WHITE_ON_BLACK, cursor_row, cursor_col);
     }
+    /* graphics command removed */
+    /*
     else if (strcmp(command, "graphics") == 0) {
         cursor_row++;
         cursor_col = 0;
@@ -907,6 +954,9 @@ void execute_command(const char* command) {
         k_print_string("Returned to text mode!", WHITE_ON_BLACK, cursor_row, cursor_col);
         print_shell_prompt();
     }
+    */
+    /* gfxtest command removed */
+    /*
     else if (strcmp(command, "gfxtest") == 0) {
         cursor_row++;
         cursor_col = 0;
@@ -954,23 +1004,8 @@ void execute_command(const char* command) {
         k_print_string("Graphics test completed!", WHITE_ON_BLACK, cursor_row, cursor_col);
         print_shell_prompt();
     }
-    else if (strcmp(command, "gui") == 0) {
-        cursor_row++;
-        cursor_col = 0;
-        k_print_string("Starting GUI desktop environment...", WHITE_ON_BLACK, cursor_row, cursor_col);
-        
-        // For now, directly call the GUI function instead of using incomplete multitasking
-        // TODO: Fix context switching in scheduler for proper multitasking
-        serial_write_string("Calling GUI process directly...\n");
-        gui_process_main();
-        
-        // After GUI exits, we return here
-        clear_screen();
-        cursor_row = 5;
-        cursor_col = 0;
-        k_print_string("Returned from GUI to shell", WHITE_ON_BLACK, cursor_row, cursor_col);
-        print_shell_prompt();
-    }
+    */
+    // GUI command removed for minimal text-only build
     else if (command_length > 0) {
         cursor_row++;
         cursor_col = 0;
@@ -990,9 +1025,6 @@ void clear_command_buffer() {
 
 // Process a character input and display it in the terminal
 void terminal_putchar(char c) {
-    // Remove current cursor
-    k_print_char(' ', WHITE_ON_BLACK, cursor_row, cursor_col);
-    
     // Handle special characters
     if (c == '\n') {
         // New line - process command
@@ -1050,8 +1082,11 @@ void kernel_main() {
     serial_write_string("\n\n=== aceOS Enhanced v2.0 Starting Up ===\n");
     serial_write_string("Serial debug output initialized\n");
 
-    k_print_string("*** aceOS Enhanced v2.0 Loaded! ***", WHITE_ON_BLACK, 0, 0);
-    k_print_string("Advanced Memory, Multitasking, Disk I/O", WHITE_ON_BLACK, 1, 0);
+    // Enable hardware cursor for better UX
+    vga_enable_cursor();
+
+    k_print_string("*** aceOS Enhanced v2.0 Loaded! ***\n", WHITE_ON_BLACK, 0, 0);
+    k_print_string("Advanced Memory, Multitasking, Disk I/O\n", WHITE_ON_BLACK, 1, 0);
     serial_write_string("Enhanced kernel loaded successfully!\n");
     
     // Initialize interrupt system
@@ -1102,9 +1137,7 @@ void kernel_main() {
     // Initialize C standard library
     libc_init();
     
-    // Initialize graphics subsystem
-    k_print_string("Initializing graphics subsystem...", WHITE_ON_BLACK, 9, 0);
-    graphics_init();
+    // Graphics subsystem not initialized in minimal text-only build
     
     // Initialize filesystem
     k_print_string("Initializing filesystem...", WHITE_ON_BLACK, 10, 0);
@@ -1116,9 +1149,9 @@ void kernel_main() {
     syscall_init();
 
     // System ready message
-    k_print_string("Enhanced system initialization complete!", WHITE_ON_BLACK, 11, 0);
-    k_print_string("aceOS Enhanced Shell v2.0", WHITE_ON_BLACK, 12, 0);
-    k_print_string("Type 'help' for available commands", WHITE_ON_BLACK, 13, 0);
+    k_print_string("Enhanced system initialization complete!\n", WHITE_ON_BLACK, 12, 0);
+    k_print_string("aceOS Enhanced Shell v2.0\n", WHITE_ON_BLACK, 13, 0);
+    k_print_string("Type 'help' for available commands\n", WHITE_ON_BLACK, 14, 0);
     
     // Print system information to serial
     serial_write_string("\n=== SYSTEM INFORMATION ===\n");
@@ -1133,7 +1166,7 @@ void kernel_main() {
     timer_print_stats();
 
     // Initialize shell
-    cursor_row = 15;
+    cursor_row = 16;
     cursor_col = 0;
     clear_command_buffer();
     print_shell_prompt();
